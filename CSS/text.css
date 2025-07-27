@@ -117,3 +117,51 @@ footer div p {
     margin: 10px;
 
 }
+
+
+
+
+.file-tree ul {
+    list-style: none;
+    padding-left: 1.2em;
+    margin: 0;
+}
+
+.file-tree li {
+    margin: 4px 0;
+    position: relative;
+    padding-left: 1.2em;
+    text-align: left !important;
+}
+
+.file-tree li::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0.7em;
+    width: 0.8em;
+    height: 2px;
+    background: #ffe346;
+    border-radius: 2px;
+    opacity: 0.5;
+}
+
+.file-tree .folder {
+    color: #6082ff;
+    font-weight: bold;
+}
+
+.file-tree .file {
+    color: #fff;
+}
+
+.file-tree a {
+    color: inherit;
+    text-decoration: none;
+    transition: color 0.2s;
+}
+
+.file-tree a:hover {
+    color: #ff0deb;
+    text-decoration: underline;
+}

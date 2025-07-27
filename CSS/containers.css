@@ -34,6 +34,22 @@ div.toc {
     --webkit-backdrop-filter: blur(25px);
 }
 
+.file-tree {
+    font-family: 'Consolas', 'Courier New', monospace;
+    background: #181a20;
+    color: #ffe346;
+    border-radius: 50px;
+    padding: 20px 50px;
+    margin: auto 24px auto;
+    max-width: 600px;
+    box-shadow: 0 2px 12px #0006;
+    background-color: rgba(54, 54, 54, 0.237);
+    text-align: left !important;
+    font-size: 1.1rem;
+        backdrop-filter: blur(25px);
+            --webkit-backdrop-filter: blur(25px);
+}
+
 .contact {
     flex-direction: column;
     align-items: center;
