@@ -2,6 +2,14 @@ async function fetchAndRenderTree(url, parentUl) {
   const response = await fetch(url);
   const data = await response.json();
 
+  // Sort: folders first, then files, both alphabetically
+  data.sort((a, b) => {
+    if (a.type === b.type) {
+      return a.name.localeCompare(b.name);
+    }
+    return a.type === 'dir' ? -1 : 1;
+  });
+
   for (const item of data) {
     const li = document.createElement('li');
     li.className = item.type === 'dir' ? 'folder' : 'file';
