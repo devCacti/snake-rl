@@ -10,7 +10,7 @@ class ReplayBuffer:
     def __len__(self):
         return len(self.buffer)
 
-    def add(self, state, action, reward, next_state, done):
+    def append(self, state, action, reward, next_state, done):
         self.buffer.append((state, action, reward, next_state, done))
 
     def sample(self, batch_size):

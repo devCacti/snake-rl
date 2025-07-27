@@ -3,8 +3,8 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 from collections import deque
-from model import DQN
-from replay_buffer import ReplayBuffer
+from dqn.model import DQN
+from dqn.replay_buffer import ReplayBuffer
 
 
 class DQNAgent:
@@ -18,6 +18,7 @@ class DQNAgent:
         epsilon_start=1.0,
         epsilon_end=0.01,
         epsilon_decay=500,
+        batch_size=64,
     ):
         self.state_dim = state_dim
         self.action_dim = action_dim
@@ -30,7 +31,7 @@ class DQNAgent:
 
         self.optimizer = torch.optim.Adam(self.policy_net.parameters(), lr=lr)
         self.memory = ReplayBuffer(capacity=100_000)
-        self.batch_size = 64
+        self.batch_size = batch_size
         self.gamma = gamma
 
         self.epsilon = epsilon_start
@@ -38,21 +39,32 @@ class DQNAgent:
         self.epsilon_decay = epsilon_decay
         self.steps_done = 0
 
-    def select_action(self, state):
-        self.steps_done += 1
+    def select_action(self, states):
+        if isinstance(states, tuple):
+            states = states[0]
+        batch_size = states.shape[0]
+        self.steps_done += batch_size
+
+        # Epsilon decay (same for whole batch)
         eps_threshold = self.epsilon_end + (self.epsilon - self.epsilon_end) * np.exp(
             -1.0 * self.steps_done / self.epsilon_decay
         )
 
-        if random.random() < eps_threshold:
-            return random.randint(0, self.action_dim - 1)
-        else:
-            with torch.no_grad():
-                state = torch.FloatTensor(state).unsqueeze(0).to(self.device)
-                return self.policy_net(state).argmax(dim=1).item()
+        actions = []
+        states_tensor = torch.FloatTensor(states).to(self.device)
+        with torch.no_grad():
+            q_values = self.policy_net(states_tensor)
+
+        for i in range(batch_size):
+            if random.random() < eps_threshold:
+                actions.append(random.randint(0, self.action_dim - 1))
+            else:
+                actions.append(q_values[i].argmax().item())
+
+        return np.array(actions)
 
     def store_transition(self, state, action, reward, next_state, done):
-        self.memory.append((state, action, reward, next_state, done))
+        self.memory.buffer.append((state, action, reward, next_state, done))
 
     def train_step(self):
         if len(self.memory) < self.batch_size:

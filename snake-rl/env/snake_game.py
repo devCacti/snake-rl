@@ -1,5 +1,3 @@
-# Imports
-
 import numpy as np
 import gym
 from gym import spaces
@@ -16,21 +14,27 @@ GAMEOVER = -1
 
 
 class SnakeGame(gym.Env):
+
     def __init__(self, grid_size=10):
         super(SnakeGame, self).__init__()
         self.grid_size = grid_size
         self.action_space = spaces.Discrete(4)  # Up, Down, Left, Right
+        self.snake = [(grid_size // 2, grid_size // 2)]
+        self.direction = (0, 1)  # Start moving right
+        self.food = self._place_food()
+        self.reset()
         obs = self._get_observation()
         self.observation_space = spaces.Box(
             low=-1.0, high=1.0, shape=(len(obs),), dtype=np.float32
         )
-        self.reset()
 
-    def reset(self):
+    def reset(self, *, seed=None, options=None):
+        # Do NOT call super().reset(seed=seed)
         self.snake = [(self.grid_size // 2, self.grid_size // 2)]
-        self.direction = (0, 1)  # Start moving right
+        self.direction = (0, 1)
         self.food = self._place_food()
-        return self._get_observation()
+        obs = self._get_observation()
+        return obs, {}  # Or return obs, {} if you want to add info dict
 
     def step(self, action):
         # Action Space
@@ -44,18 +48,20 @@ class SnakeGame(gym.Env):
         elif action == 3:  # Right
             self.direction = (0, 1)
 
+        self.render()
+
         new_head = (
             self.snake[0][0] + self.direction[0],
             self.snake[0][1] + self.direction[1],
         )
 
-        prev_dist = _euclidean_dist(self.snake[0], self.food)
-        new_dist = _euclidean_dist(new_head, self.food)
+        prev_dist = self._euclidean_dist(self.snake[0], self.food)
+        new_dist = self._euclidean_dist(new_head, self.food)
 
         if new_head in self.snake or not (
             0 <= new_head[0] < self.grid_size and 0 <= new_head[1] < self.grid_size
         ):
-            return self._get_observation(), GAMEOVER, True, {}  # Game over
+            return self._get_observation(), GAMEOVER, True, False, {}  # Game over
 
         if new_head == self.food:
             self.snake.insert(0, new_head)
@@ -69,7 +75,14 @@ class SnakeGame(gym.Env):
 
             reward += ALIVE  # Small positive reward for moving
 
-        return self._get_observation(), reward, False, {}
+        # if (c_step + 1) % 10 == 0:
+        #    self.render()
+
+        # c_step += 1
+        return self._get_observation(), reward, False, False, {}
+
+    def _euclidean_dist(self, a, b):
+        return np.sqrt((a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2)
 
     def _get_observation(self):
         head_y, head_x = self.snake[0]
