@@ -4,7 +4,8 @@ from env.snake_game import SnakeGame
 from dqn.agent import DQNAgent
 import gym
 
-NUM_ENVS = 1
+NUM_ENVS = 25
+BATCH_SIZE = 128
 
 
 def make_env():
@@ -12,10 +13,10 @@ def make_env():
 
 
 def train():
-    envs = gym.vector.AsyncVectorEnv([make_env() for _ in range(NUM_ENVS)])
+    envs = gym.vector.AsyncVectorEnv([make_env() for _ in range(NUM_ENVS)])  # type: ignore
 
-    obs_dim = envs.single_observation_space.shape[0]
-    n_actions = envs.single_action_space.n
+    obs_dim = envs.single_observation_space.shape[0]  # type: ignore
+    n_actions = envs.single_action_space.n  # type: ignore
 
     agent = DQNAgent(
         state_dim=obs_dim,
@@ -23,10 +24,10 @@ def train():
         device=torch.device("cuda" if torch.cuda.is_available() else "cpu"),
         epsilon_start=1.0,
         epsilon_end=0.01,
-        epsilon_decay=500,
-        gamma=0.99,
-        lr=1e-3,
-        batch_size=64,
+        epsilon_decay=500,  # Epsilon decay steps, 500 means it decays over 500 steps
+        gamma=0.99,  # Discount factor
+        lr=1e-3,  # Learning rate, it means the optimizer will update the model weights with this learning rate
+        batch_size=BATCH_SIZE,
     )
 
     print(f"Using device: {agent.device}")
@@ -39,9 +40,8 @@ def train():
     target_update_freq = 1000
 
     for step in range(max_steps):
-        print(f"Step {step + 1}/{max_steps}")
         actions = agent.select_action(states)
-        next_states, rewards, terminations, truncations, infos = envs.step(actions)
+        next_states, rewards, terminations, truncations, infos = envs.step(actions)  # type: ignore
         dones = np.logical_or(terminations, truncations)
 
         for i in range(NUM_ENVS):

@@ -24,6 +24,7 @@ class SnakeGame(gym.Env):
         self.food = self._place_food()
         self.reset()
         obs = self._get_observation()
+        self.step_count = 0
         self.observation_space = spaces.Box(
             low=-1.0, high=1.0, shape=(len(obs),), dtype=np.float32
         )
@@ -37,6 +38,7 @@ class SnakeGame(gym.Env):
         return obs, {}  # Or return obs, {} if you want to add info dict
 
     def step(self, action):
+        self.step_count += 1
         # Action Space
         # 0: Up, 1: Down, 2: Left, 3: Right
         if action == 0:  # Up
@@ -48,7 +50,8 @@ class SnakeGame(gym.Env):
         elif action == 3:  # Right
             self.direction = (0, 1)
 
-        self.render()
+        if self.step_count % 25 == 0:
+            self.render()
 
         new_head = (
             self.snake[0][0] + self.direction[0],
@@ -68,6 +71,8 @@ class SnakeGame(gym.Env):
             self.food = self._place_food()
             reward = EAT_FOOD  # Reward for eating food
         else:
+            self.snake.insert(0, new_head)  # Always move the head
+            self.snake.pop()  # Remove the tail if not eating
             if prev_dist < new_dist:
                 reward = CLOSER
             else:
@@ -137,7 +142,7 @@ class SnakeGame(gym.Env):
 
     def render(self, mode="human"):
         # --- Pygame graphical rendering ---
-        cell_size = 30
+        cell_size = 10
         width, height = self.grid_size * cell_size, self.grid_size * cell_size
 
         if not hasattr(self, "screen"):
@@ -191,7 +196,7 @@ class SnakeGame(gym.Env):
             elif keyboard.is_pressed("d"):
                 action = 3
 
-            obs, reward, done, _ = self.step(action)
+            obs, reward, done, _, __ = self.step(action)
             print(f"Reward: {reward}")
             if done:
                 print("Game Over!")
