@@ -3,9 +3,13 @@ import torch
 from env.snake_game import SnakeGame
 from dqn.agent import DQNAgent
 import gym
+import matplotlib.pyplot as plt
+from IPython.display import display, clear_output
+import pandas as pd
+from sklearn.linear_model import LinearRegression  # Add at the top
 
 NUM_ENVS = 25
-BATCH_SIZE = 128
+BATCH_SIZE = 256
 
 
 def make_env():
@@ -13,6 +17,7 @@ def make_env():
 
 
 def train():
+
     envs = gym.vector.AsyncVectorEnv([make_env() for _ in range(NUM_ENVS)])  # type: ignore
 
     obs_dim = envs.single_observation_space.shape[0]  # type: ignore
@@ -39,6 +44,14 @@ def train():
     max_steps = 200_000
     target_update_freq = 1000
 
+    avg_rewards = []
+    plt.ion()  # Turn on interactive mode
+    fig, ax = plt.subplots()
+    (line,) = ax.plot([], [])
+    ax.set_xlabel("Step")
+    ax.set_ylabel("Average Reward")
+    ax.set_title("Training Progress")
+
     for step in range(max_steps):
         actions = agent.select_action(states)
         next_states, rewards, terminations, truncations, infos = envs.step(actions)  # type: ignore
@@ -52,7 +65,70 @@ def train():
             if dones[i]:
                 episode_rewards[i] = 0
 
+        # Train the agent multiple times per step
+        # This is to ensure that the agent learns from the transitions
+        # This is a common practice in DQN to stabilize training
         agent.train_step()
+        agent.train_step()
+        agent.train_step()
+        agent.train_step()
+        agent.train_step()
+
+        if step % 500 == 0:
+            avg_reward = np.mean(episode_rewards)
+            avg_rewards.append(avg_reward)
+            print(f"Step: {step}, Average Reward: {avg_reward}")
+
+            # Update main line
+            x_vals = np.arange(len(avg_rewards)) * 500
+            line.set_xdata(x_vals)
+            line.set_ydata(avg_rewards)
+
+            # --- Moving average trend line (window=10) ---
+            if len(avg_rewards) >= 10:
+                ma = pd.Series(avg_rewards).rolling(window=10).mean()
+                if not hasattr(ax, "ma_line"):
+                    (ax.ma_line,) = ax.plot(
+                        x_vals, ma, color="red", linewidth=2, label="Moving Avg"
+                    )
+                else:
+                    ax.ma_line.set_xdata(x_vals)
+                    ax.ma_line.set_ydata(ma)
+            else:
+                if hasattr(ax, "ma_line"):
+                    ax.ma_line.set_xdata([])
+                    ax.ma_line.set_ydata([])
+
+            # --- Linear regression trend line (every 5000 steps) ---
+            if step % 5000 == 0 and len(avg_rewards) > 1:
+                x = x_vals.reshape(-1, 1)
+                y = np.array(avg_rewards)
+                model = LinearRegression().fit(x, y)
+                y_pred = model.predict(x)
+                if not hasattr(ax, "trend_line"):
+                    (ax.trend_line,) = ax.plot(
+                        x_vals,
+                        y_pred,
+                        color="green",
+                        linestyle="--",
+                        linewidth=2,
+                        label="Trend",
+                    )
+                else:
+                    ax.trend_line.set_xdata(x_vals)
+                    ax.trend_line.set_ydata(y_pred)
+            elif hasattr(ax, "trend_line"):
+                ax.trend_line.set_xdata([])
+                ax.trend_line.set_ydata([])
+
+            # Only add legend once
+            if not hasattr(ax, "_legend_added"):
+                ax.legend()
+                ax._legend_added = True
+
+            ax.relim()
+            ax.autoscale_view()
+            plt.draw()
 
         states = next_states
 

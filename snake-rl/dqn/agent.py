@@ -16,7 +16,7 @@ class DQNAgent:
         gamma=0.99,
         lr=1e-3,
         epsilon_start=1.0,
-        epsilon_end=0.01,
+        epsilon_end=0.1,
         epsilon_decay=500,
         batch_size=64,
     ):
@@ -30,7 +30,7 @@ class DQNAgent:
         self.target_net.eval()
 
         self.optimizer = torch.optim.Adam(self.policy_net.parameters(), lr=lr)
-        self.memory = ReplayBuffer(capacity=100_000)
+        self.memory = ReplayBuffer(capacity=50_000)
         self.batch_size = batch_size
         self.gamma = gamma
 
@@ -82,7 +82,9 @@ class DQNAgent:
 
         q_values = self.policy_net(states).gather(1, actions)
         with torch.no_grad():
-            max_next_q_values = self.target_net(next_states).max(1)[0].unsqueeze(1)
+            max_next_q_values = (
+                self.target_net(next_states).max(1)[0].unsqueeze(1).to(self.device)
+            )
             target_q_values = rewards + self.gamma * max_next_q_values * (1 - dones)
 
         loss = F.mse_loss(q_values, target_q_values)

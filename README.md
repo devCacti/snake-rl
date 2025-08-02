@@ -15,3 +15,11 @@ I will be using Python as the main programming language.
 ### PyTorch
 
 The main library I will be using is `PyTorch`, I will not be using `TensorFlow` due to it's requirement of a Unix based system.
+
+## Run Commands
+
+### Train Mode
+
+1. **Run** `cd snake-rl`
+
+2. **Run** `python -m dqn.train`

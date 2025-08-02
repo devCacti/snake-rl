@@ -53,8 +53,8 @@ class SnakeGame(gym.Env):
         elif action == 3:  # Right
             self.direction = (0, 1)
 
-        if self.step_count % 100 == 0:
-            self.render()
+        # if self.step_count % 100 == 0:
+        #    self.render()
 
         new_head = (
             self.snake[0][0] + self.direction[0],
