@@ -8,7 +8,7 @@ from IPython.display import display, clear_output
 import pandas as pd
 from sklearn.linear_model import LinearRegression  # Add at the top
 
-NUM_ENVS = 25
+NUM_ENVS = 20
 BATCH_SIZE = 256
 
 
@@ -28,9 +28,9 @@ def train():
         action_dim=n_actions,
         device=torch.device("cuda" if torch.cuda.is_available() else "cpu"),
         epsilon_start=1.0,
-        epsilon_end=0.01,
+        epsilon_end=0.1,
         epsilon_decay=500,  # Epsilon decay steps, 500 means it decays over 500 steps
-        gamma=0.99,  # Discount factor
+        gamma=0.995,  # Discount factor
         lr=1e-3,  # Learning rate, it means the optimizer will update the model weights with this learning rate
         batch_size=BATCH_SIZE,
     )
@@ -73,11 +73,14 @@ def train():
         agent.train_step()
         agent.train_step()
         agent.train_step()
+        agent.train_step()
 
         if step % 500 == 0:
             avg_reward = np.mean(episode_rewards)
             avg_rewards.append(avg_reward)
-            print(f"Step: {step}, Average Reward: {avg_reward}")
+            print(
+                f"Step: {step}, Average Reward: {avg_reward:.2f}, Epsilon: {agent.epsilon:.2f}"
+            )
 
             # Update main line
             x_vals = np.arange(len(avg_rewards)) * 500
@@ -85,8 +88,8 @@ def train():
             line.set_ydata(avg_rewards)
 
             # --- Moving average trend line (window=10) ---
-            if len(avg_rewards) >= 10:
-                ma = pd.Series(avg_rewards).rolling(window=10).mean()
+            if len(avg_rewards) >= 2:
+                ma = pd.Series(avg_rewards).rolling(window=5).mean()
                 if not hasattr(ax, "ma_line"):
                     (ax.ma_line,) = ax.plot(
                         x_vals, ma, color="red", linewidth=2, label="Moving Avg"
@@ -99,8 +102,8 @@ def train():
                     ax.ma_line.set_xdata([])
                     ax.ma_line.set_ydata([])
 
-            # --- Linear regression trend line (every 5000 steps) ---
-            if step % 5000 == 0 and len(avg_rewards) > 1:
+            # --- Linear regression trend line (every 1000 steps) ---
+            if len(avg_rewards) > 1:
                 x = x_vals.reshape(-1, 1)
                 y = np.array(avg_rewards)
                 model = LinearRegression().fit(x, y)
@@ -117,9 +120,6 @@ def train():
                 else:
                     ax.trend_line.set_xdata(x_vals)
                     ax.trend_line.set_ydata(y_pred)
-            elif hasattr(ax, "trend_line"):
-                ax.trend_line.set_xdata([])
-                ax.trend_line.set_ydata([])
 
             # Only add legend once
             if not hasattr(ax, "_legend_added"):
@@ -129,6 +129,7 @@ def train():
             ax.relim()
             ax.autoscale_view()
             plt.draw()
+            plt.pause(0.1)
 
         states = next_states
 
