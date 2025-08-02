@@ -4,7 +4,7 @@ from env.snake_game import SnakeGame
 from dqn.agent import DQNAgent
 import gym
 
-NUM_ENVS = 50
+NUM_ENVS = 25
 BATCH_SIZE = 128
 
 
@@ -50,11 +50,10 @@ def train():
             )
             episode_rewards[i] += rewards[i]
             if dones[i]:
-                if step % 100 == 0:
-                    print(f"[Env {i}] done: reward {episode_rewards[i]:.2f}")
                 episode_rewards[i] = 0
 
         agent.train_step()
+
         states = next_states
 
         if step % target_update_freq == 0:
