@@ -12,6 +12,9 @@ ALIVE = 0.001
 FURTHER = -0.005
 GAMEOVER = -1
 
+# Constants for rendering
+CELL_SIZE = 20  # Size of each cell in pixels
+
 
 class SnakeGame(gym.Env):
 
@@ -50,7 +53,7 @@ class SnakeGame(gym.Env):
         elif action == 3:  # Right
             self.direction = (0, 1)
 
-        if self.step_count % 25 == 0:
+        if self.step_count % 100 == 0:
             self.render()
 
         new_head = (
@@ -142,7 +145,7 @@ class SnakeGame(gym.Env):
 
     def render(self, mode="human"):
         # --- Pygame graphical rendering ---
-        cell_size = 10
+        cell_size = CELL_SIZE
         width, height = self.grid_size * cell_size, self.grid_size * cell_size
 
         if not hasattr(self, "screen"):

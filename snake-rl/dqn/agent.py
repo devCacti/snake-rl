@@ -93,3 +93,24 @@ class DQNAgent:
 
     def update_target_network(self):
         self.target_net.load_state_dict(self.policy_net.state_dict())
+
+    def save(self, path):
+        torch.save(
+            {
+                "model_state_dict": self.policy_net.state_dict(),
+                "target_state_dict": self.target_net.state_dict(),
+                "optimizer_state_dict": self.optimizer.state_dict(),
+            },
+            path,
+        )
+
+    def load(self, path):
+        checkpoint = torch.load(path, map_location=self.device)
+        self.policy_net.load_state_dict(checkpoint["model_state_dict"])
+        self.target_net.load_state_dict(checkpoint["target_state_dict"])
+        self.optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
+        self.policy_net.to(self.device)
+        self.target_net.to(self.device)
+        self.policy_net.eval()
+        self.target_net.eval()
+        self.memory = ReplayBuffer(capacity=100_000)
