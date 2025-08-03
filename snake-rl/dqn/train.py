@@ -9,7 +9,7 @@ import pandas as pd
 from sklearn.linear_model import LinearRegression  # Add at the top
 
 NUM_ENVS = 25
-BATCH_SIZE = 512
+BATCH_SIZE = 128
 
 
 def make_env():
@@ -72,7 +72,7 @@ def train():
         # This is to ensure that the agent learns from the transitions
         # This is a common practice in DQN to stabilize training
         agent.train_step()
-        # agent.train_step()
+        agent.train_step()
         # agent.train_step()
         # agent.train_step()
         # agent.train_step()

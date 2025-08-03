@@ -2,7 +2,6 @@ import numpy as np
 import gym
 from gym import spaces
 import random
-import pygame
 from torch import _euclidean_dist
 
 # Rewards
@@ -172,6 +171,8 @@ class SnakeGame(gym.Env):
                 return food_position
 
     def render(self, mode="human"):
+        import pygame
+
         # --- Pygame graphical rendering ---
         cell_size = CELL_SIZE
         width, height = self.grid_size * cell_size, self.grid_size * cell_size
