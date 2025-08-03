@@ -56,7 +56,7 @@ a {
 h2.info {
     text-decoration: underline;
     /*Underline size*/
-    text-underline-offset: 0.9em;
+    text-underline-offset: 0.2em;
     text-decoration-thickness: 0.01em;
     text-decoration-color: #a1a1a1;
 }
@@ -164,4 +164,21 @@ footer div p {
 .file-tree a:hover {
     color: #ff0deb;
     text-decoration: underline;
+}
+
+ul {
+    list-style: none;
+}
+
+div.toc p,
+div.toc a,
+div.toc h1,
+div.toc h2,
+div.toc h3,
+div.toc h4,
+div.toc h5,
+div.toc h6 {
+    margin-left: 50px;
+    margin-right: 50px;
+    color: #fff;
 }

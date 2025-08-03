@@ -30,7 +30,7 @@ class DQNAgent:
         self.target_net.eval()
 
         self.optimizer = torch.optim.Adam(self.policy_net.parameters(), lr=lr)
-        self.memory = ReplayBuffer(capacity=250_000)
+        self.memory = ReplayBuffer(capacity=50_000)
         self.batch_size = batch_size
         self.gamma = gamma
 
@@ -40,7 +40,6 @@ class DQNAgent:
         self.steps_done = 0
 
     def select_action(self, states):
-        sample = random.random()
         if isinstance(states, tuple):
             states = states[0]
         batch_size = states.shape[0]

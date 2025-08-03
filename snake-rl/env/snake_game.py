@@ -6,13 +6,15 @@ import pygame
 from torch import _euclidean_dist
 
 # Rewards
-EAT_FOOD = 1
-CLOSER = 0.01
-ALIVE = 0.001
-FURTHER = -0.01
-GAMEOVER = -1
+EAT_FOOD = +1.0
+DIE = -1.0
 STEP_PENALTY = -0.01
-DANGER_PENALTY = -0.1
+ALIVE = +0.02
+
+# Reward scaling factors
+ALIGN_SCALE = 0.05
+DIST_SCALE = 0.1
+DANGER_SCALE = 0.05
 
 # Constants for rendering
 CELL_SIZE = 20  # Size of each cell in pixels
@@ -73,7 +75,7 @@ class SnakeGame(gym.Env):
         if new_head in self.snake or not (
             0 <= new_head[0] < self.grid_size and 0 <= new_head[1] < self.grid_size
         ):
-            return self._get_observation(), GAMEOVER, True, False, {}  # Game over
+            return self._get_observation(), DIE, True, False, {}  # Game over
 
         if new_head == self.food:
             self.snake.insert(0, new_head)
@@ -82,11 +84,31 @@ class SnakeGame(gym.Env):
         else:
             self.snake.insert(0, new_head)  # Always move the head
             self.snake.pop()  # Remove the tail if not eating
-            if prev_dist < new_dist:
-                reward = CLOSER
-            else:
-                reward = FURTHER
 
+            distance_delta = prev_dist - new_dist
+            reward = DIST_SCALE * distance_delta  # Reward for getting closer to food
+
+            alignment = np.array(
+                [
+                    self.food[0] - new_head[0] / self.grid_size,
+                    self.food[1] - new_head[1] / self.grid_size,
+                ]
+            )
+
+            dirv = np.array(self.direction)
+
+            reward += ALIGN_SCALE * np.dot(
+                alignment, dirv
+            )  # Reward for aligning with food
+
+            num_dangers = sum(
+                self.is_danger(new_head, dx, dy)
+                for dx, dy in [(0, 1), (0, -1), (-1, 0), (1, 0)]
+            )
+
+            reward -= DANGER_SCALE * num_dangers  # Penalty for danger
+            reward += STEP_PENALTY  # Small penalty for each step taken
+            reward += ALIGN_SCALE * (self.direction[0] + self.direction[1])
             reward += ALIVE  # Small positive reward for moving
 
         # c_step += 1
@@ -95,17 +117,18 @@ class SnakeGame(gym.Env):
     def _euclidean_dist(self, a, b):
         return np.sqrt((a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2)
 
-    def is_danger(self, offset_x, offset_y):
-        head_y, head_x = self.snake[0]
-        next_x = head_x + offset_x
-        next_y = head_y + offset_y
+    def is_danger(self, from_pos, offset_x, offset_y):
+        y, x = from_pos
+        next_x = x + offset_x
+        next_y = y + offset_y
         return (
             not (0 <= next_x < self.grid_size and 0 <= next_y < self.grid_size)
             or (next_y, next_x) in self.snake
         )
 
     def _get_observation(self):
-        head_y, head_x = self.snake[0]
+        head = self.snake[0]
+        head_y, head_x = head
         food_y, food_x = self.food
 
         rel_x = (food_x - head_x) / self.grid_size
@@ -120,9 +143,9 @@ class SnakeGame(gym.Env):
         dir_right = int((dx, dy) == (0, 1))
 
         # Danger detection
-        danger_front = self.is_danger(dx, dy)
-        danger_left = self.is_danger(-dy, dx)  # 90° left
-        danger_right = self.is_danger(dy, -dx)  # 90° right
+        danger_front = self.is_danger(head, dx, dy)
+        danger_left = self.is_danger(head, -dy, dx)  # 90° left
+        danger_right = self.is_danger(head, dy, -dx)  # 90° right
 
         obs = [
             rel_x,

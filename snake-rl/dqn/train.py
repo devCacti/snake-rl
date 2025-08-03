@@ -9,7 +9,7 @@ import pandas as pd
 from sklearn.linear_model import LinearRegression  # Add at the top
 
 NUM_ENVS = 25
-BATCH_SIZE = 256
+BATCH_SIZE = 512
 
 
 def make_env():
@@ -29,7 +29,7 @@ def train():
         device=torch.device("cuda" if torch.cuda.is_available() else "cpu"),
         epsilon_start=1.0,  # Max epsilon
         epsilon_end=0.1,  # Min epsilon
-        epsilon_decay=500,  # ? I do not know why this is
+        epsilon_decay=10000,
         gamma=0.99,  # Discount factor
         lr=1e-3,  # ? I do not know what this is used for
         batch_size=BATCH_SIZE,
