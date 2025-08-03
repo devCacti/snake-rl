@@ -9,8 +9,10 @@ from torch import _euclidean_dist
 EAT_FOOD = 1
 CLOSER = 0.01
 ALIVE = 0.001
-FURTHER = -0.005
+FURTHER = -0.01
 GAMEOVER = -1
+STEP_PENALTY = -0.01
+DANGER_PENALTY = -0.1
 
 # Constants for rendering
 CELL_SIZE = 20  # Size of each cell in pixels
@@ -26,10 +28,12 @@ class SnakeGame(gym.Env):
         self.direction = (0, 1)  # Start moving right
         self.food = self._place_food()
         self.reset()
-        obs = self._get_observation()
+        obs = self._get_observation()  # Initial observation
         self.step_count = 0
-        self.observation_space = spaces.Box(
-            low=-1.0, high=1.0, shape=(len(obs),), dtype=np.float32
+        self.observation_space = (
+            spaces.Box(  # Calculates the size of the observation space
+                low=-1.0, high=1.0, shape=(len(obs),), dtype=np.float32
+            )
         )
 
     def reset(self, *, seed=None, options=None):
@@ -38,12 +42,14 @@ class SnakeGame(gym.Env):
         self.direction = (0, 1)
         self.food = self._place_food()
         obs = self._get_observation()
-        return obs, {}  # Or return obs, {} if you want to add info dict
+
+        # Or return obs, {} is for compatibility with gym API, it also allows for additional info if needed
+        return (obs, {})
 
     def step(self, action):
         self.step_count += 1
-        # Action Space
-        # 0: Up, 1: Down, 2: Left, 3: Right
+
+        # Action mapping: 0: Up, 1: Down, 2: Left, 3: Right
         if action == 0:  # Up
             self.direction = (-1, 0)
         elif action == 1:  # Down
@@ -53,14 +59,14 @@ class SnakeGame(gym.Env):
         elif action == 3:  # Right
             self.direction = (0, 1)
 
-        # if self.step_count % 100 == 0:
-        #    self.render()
-
+        # Calculates the new head position based on the current direction
         new_head = (
             self.snake[0][0] + self.direction[0],
             self.snake[0][1] + self.direction[1],
         )
 
+        # Calculates the delta distance to the food
+        # This is used to determine if the snake is getting closer or further from the food
         prev_dist = self._euclidean_dist(self.snake[0], self.food)
         new_dist = self._euclidean_dist(new_head, self.food)
 
@@ -83,14 +89,20 @@ class SnakeGame(gym.Env):
 
             reward += ALIVE  # Small positive reward for moving
 
-        # if (c_step + 1) % 10 == 0:
-        #    self.render()
-
         # c_step += 1
         return self._get_observation(), reward, False, False, {}
 
     def _euclidean_dist(self, a, b):
         return np.sqrt((a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2)
+
+    def is_danger(self, offset_x, offset_y):
+        head_y, head_x = self.snake[0]
+        next_x = head_x + offset_x
+        next_y = head_y + offset_y
+        return (
+            not (0 <= next_x < self.grid_size and 0 <= next_y < self.grid_size)
+            or (next_y, next_x) in self.snake
+        )
 
     def _get_observation(self):
         head_y, head_x = self.snake[0]
@@ -108,17 +120,9 @@ class SnakeGame(gym.Env):
         dir_right = int((dx, dy) == (0, 1))
 
         # Danger detection
-        def is_danger(offset_x, offset_y):
-            next_x = head_x + offset_x
-            next_y = head_y + offset_y
-            return (
-                not (0 <= next_x < self.grid_size and 0 <= next_y < self.grid_size)
-                or (next_y, next_x) in self.snake
-            )
-
-        danger_front = is_danger(dx, dy)
-        danger_left = is_danger(-dy, dx)  # 90° left
-        danger_right = is_danger(dy, -dx)  # 90° right
+        danger_front = self.is_danger(dx, dy)
+        danger_left = self.is_danger(-dy, dx)  # 90° left
+        danger_right = self.is_danger(dy, -dx)  # 90° right
 
         obs = [
             rel_x,
@@ -130,7 +134,8 @@ class SnakeGame(gym.Env):
             dir_down,
             dir_left,
             dir_right,
-            # len(self.snake) / (self.grid_size * self.grid_size),
+            # * Snake length is pointless in this case because it brings no importance to the agent if it is long or short because we are not giving it a reward for being long
+            # // len(self.snake) / (self.grid_size * self.grid_size),
         ]
         return obs
 

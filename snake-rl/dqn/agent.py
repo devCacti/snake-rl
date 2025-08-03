@@ -18,7 +18,7 @@ class DQNAgent:
         epsilon_start=1.0,
         epsilon_end=0.1,
         epsilon_decay=500,
-        batch_size=256,
+        batch_size=64,
     ):
         self.state_dim = state_dim
         self.action_dim = action_dim
@@ -30,7 +30,7 @@ class DQNAgent:
         self.target_net.eval()
 
         self.optimizer = torch.optim.Adam(self.policy_net.parameters(), lr=lr)
-        self.memory = ReplayBuffer(capacity=50_000)
+        self.memory = ReplayBuffer(capacity=250_000)
         self.batch_size = batch_size
         self.gamma = gamma
 
@@ -40,6 +40,7 @@ class DQNAgent:
         self.steps_done = 0
 
     def select_action(self, states):
+        sample = random.random()
         if isinstance(states, tuple):
             states = states[0]
         batch_size = states.shape[0]
@@ -52,12 +53,17 @@ class DQNAgent:
 
         actions = []
         states_tensor = torch.FloatTensor(states).to(self.device)
+
         with torch.no_grad():
             q_values = self.policy_net(states_tensor)
 
+        #! Epsilon-greedy action selection
         for i in range(batch_size):
+            # * If a random chosen number is less than the epsilon threshold, it will generate random actions for all environments in the batch
             if random.random() < eps_threshold:
                 actions.append(random.randint(0, self.action_dim - 1))
+
+            # * Otherwise, it will select the action with the highest Q-value
             else:
                 actions.append(q_values[i].argmax().item())
 
@@ -80,7 +86,7 @@ class DQNAgent:
         next_states = torch.FloatTensor(next_states).to(self.device)
         dones = torch.FloatTensor(dones).unsqueeze(1).to(self.device)
 
-        q_values = self.policy_net(states).gather(1, actions)
+        q_values = self.policy_net(states).gather(1, actions).to(self.device)
         with torch.no_grad():
             max_next_q_values = (
                 self.target_net(next_states).max(1)[0].unsqueeze(1).to(self.device)

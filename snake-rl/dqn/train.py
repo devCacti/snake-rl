@@ -8,7 +8,7 @@ from IPython.display import display, clear_output
 import pandas as pd
 from sklearn.linear_model import LinearRegression  # Add at the top
 
-NUM_ENVS = 20
+NUM_ENVS = 25
 BATCH_SIZE = 256
 
 
@@ -27,11 +27,11 @@ def train():
         state_dim=obs_dim,
         action_dim=n_actions,
         device=torch.device("cuda" if torch.cuda.is_available() else "cpu"),
-        epsilon_start=1.0,
-        epsilon_end=0.1,
-        epsilon_decay=500,  # Epsilon decay steps, 500 means it decays over 500 steps
-        gamma=0.995,  # Discount factor
-        lr=1e-3,  # Learning rate, it means the optimizer will update the model weights with this learning rate
+        epsilon_start=1.0,  # Max epsilon
+        epsilon_end=0.1,  # Min epsilon
+        epsilon_decay=500,  # ? I do not know why this is
+        gamma=0.99,  # Discount factor
+        lr=1e-3,  # ? I do not know what this is used for
         batch_size=BATCH_SIZE,
     )
 
@@ -57,6 +57,9 @@ def train():
         next_states, rewards, terminations, truncations, infos = envs.step(actions)  # type: ignore
         dones = np.logical_or(terminations, truncations)
 
+        if step % agent.epsilon_decay == 0:
+            agent.epsilon = max(agent.epsilon_end, agent.epsilon * agent.gamma)
+
         for i in range(NUM_ENVS):
             agent.store_transition(
                 states[i], actions[i], rewards[i], next_states[i], dones[i]
@@ -69,21 +72,21 @@ def train():
         # This is to ensure that the agent learns from the transitions
         # This is a common practice in DQN to stabilize training
         agent.train_step()
-        agent.train_step()
-        agent.train_step()
-        agent.train_step()
-        agent.train_step()
-        agent.train_step()
+        # agent.train_step()
+        # agent.train_step()
+        # agent.train_step()
+        # agent.train_step()
+        # agent.train_step()
+        # agent.train_step()
+        # agent.train_step()
 
-        if step % 500 == 0:
+        if step % target_update_freq == 0:
             avg_reward = np.mean(episode_rewards)
             avg_rewards.append(avg_reward)
-            print(
-                f"Step: {step}, Average Reward: {avg_reward:.2f}, Epsilon: {agent.epsilon:.2f}"
-            )
+            print(f"Step: {step}, Average Reward: {avg_reward:.2f}")
 
             # Update main line
-            x_vals = np.arange(len(avg_rewards)) * 500
+            x_vals = np.arange(len(avg_rewards)) * target_update_freq
             line.set_xdata(x_vals)
             line.set_ydata(avg_rewards)
 
