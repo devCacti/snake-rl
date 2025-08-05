@@ -25,7 +25,7 @@ class SnakeGame(gym.Env):
     def __init__(self, grid_size=10, render_mode="training"):
         super(SnakeGame, self).__init__()
         self.grid_size = grid_size
-        self.action_space = spaces.Discrete(4)  # Up, Down, Left, Right
+        self.action_space = spaces.Discrete(3)  # Left, Straight, Right
         self.snake = [(grid_size // 2, grid_size // 2)]
         self.direction = (0, 1)  # Start moving right
         self.food = self._place_food()
@@ -52,15 +52,21 @@ class SnakeGame(gym.Env):
     def step(self, action):
         self.step_count += 1
 
-        # Action mapping: 0: Up, 1: Down, 2: Left, 3: Right
-        if action == 0:  # Up
-            self.direction = (-1, 0)
-        elif action == 1:  # Down
-            self.direction = (1, 0)
-        elif action == 2:  # Left
-            self.direction = (0, -1)
-        elif action == 3:  # Right
-            self.direction = (0, 1)
+        # Directions in clockwise order: UP, RIGHT, DOWN, LEFT
+        directions = [(-1, 0), (0, 1), (1, 0), (0, -1)]
+
+        # Find current direction index
+        idx = directions.index(self.direction)
+
+        # Action mapping: 0 = Turn Left, 1 = Straight, 2 = Turn Right
+        if action == 0:  # Turn Left
+            idx = (idx - 1) % 4
+        elif action == 2:  # Turn Right
+            idx = (idx + 1) % 4
+        # action == 1 → Straight, idx stays the same
+
+        # Update direction
+        self.direction = directions[idx]
 
         # Calculates the new head position based on the current direction
         new_head = (
