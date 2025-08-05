@@ -126,12 +126,12 @@ class SnakeGame(gym.Env):
     def _euclidean_dist(self, a, b):
         return np.sqrt((a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2)
 
-    def is_danger(self, from_pos, offset_x, offset_y):
+    def is_danger(self, from_pos, offset_y, offset_x):
         y, x = from_pos
-        next_x = x + offset_x
         next_y = y + offset_y
+        next_x = x + offset_x
         return (
-            not (0 <= next_x < self.grid_size and 0 <= next_y < self.grid_size)
+            not (0 <= next_y < self.grid_size and 0 <= next_x < self.grid_size)
             or (next_y, next_x) in self.snake
         )
 
@@ -155,6 +155,10 @@ class SnakeGame(gym.Env):
         danger_front = self.is_danger(head, dx, dy)
         danger_left = self.is_danger(head, -dy, dx)  # 90° left
         danger_right = self.is_danger(head, dy, -dx)  # 90° right
+
+        self.danger_front_flag = danger_front
+        self.danger_left_flag = danger_left
+        self.danger_right_flag = danger_right
 
         obs = [
             rel_x,
@@ -186,35 +190,66 @@ class SnakeGame(gym.Env):
 
         import pygame
 
-        # --- Pygame graphical rendering ---
         cell_size = CELL_SIZE
         width, height = self.grid_size * cell_size, self.grid_size * cell_size
 
+        # --- Main game window ---
         if not hasattr(self, "screen"):
             pygame.init()
             self.screen = pygame.display.set_mode((width, height))
             pygame.display.set_caption("Snake RL")
             self.clock = pygame.time.Clock()
 
-        self.screen.fill((0, 0, 0))  # Black background
+        self.screen.fill((0, 0, 0))
 
-        # Draw snake
         for segment in self.snake:
             x, y = segment[1] * cell_size, segment[0] * cell_size
             pygame.draw.rect(
                 self.screen, (0, 255, 0), (x, y, cell_size, cell_size), border_radius=8
             )
 
-        # Draw food
         fx, fy = self.food[1] * cell_size, self.food[0] * cell_size
         pygame.draw.rect(
             self.screen, (255, 0, 0), (fx, fy, cell_size, cell_size), border_radius=8
         )
 
-        pygame.display.flip()
-        self.clock.tick(10)  # Limit to 10 FPS
+        # --- Stats window ---
+        stats_size = 200
+        if not hasattr(self, "stats_screen"):
+            self.stats_screen = pygame.display.set_mode((width + stats_size, height))
+            self.stats_surface = pygame.Surface((stats_size, height))
+            self.stats_surface.fill((30, 30, 30))
+            pygame.display.set_caption("Snake RL + Stats")
 
-        # Handle quit events to avoid freezing
+        # Draw snake head as green circle in center
+        self.stats_surface.fill((30, 30, 30))
+        center = (stats_size // 2, height // 2)
+        pygame.draw.circle(self.stats_surface, (0, 255, 0), center, 10)
+
+        # Draw dangers as red circles around the head
+        offset = 40
+        if getattr(self, "danger_front_flag", False):
+            pygame.draw.circle(
+                self.stats_surface, (255, 0, 0), (center[0], center[1] - offset), 10
+            )
+        if getattr(self, "danger_left_flag", False):
+            pygame.draw.circle(
+                self.stats_surface, (255, 0, 0), (center[0] - offset, center[1]), 10
+            )
+        if getattr(self, "danger_right_flag", False):
+            pygame.draw.circle(
+                self.stats_surface, (255, 0, 0), (center[0] + offset, center[1]), 10
+            )
+
+        # Combine both displays
+        combined = pygame.Surface((width + stats_size, height))
+        combined.blit(self.screen, (0, 0))
+        combined.blit(self.stats_surface, (width, 0))
+        pygame.display.get_surface().blit(combined, (0, 0))
+
+        pygame.display.flip()
+        self.clock.tick(10)
+
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 pygame.quit()
