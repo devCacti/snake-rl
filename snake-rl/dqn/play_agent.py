@@ -18,7 +18,7 @@ class PlayAgent:
         epsilon_start=1.0,
         epsilon_end=0.1,
         epsilon_decay=500,
-        batch_size=64,
+        batch_size=256,
     ):
         self.state_dim = state_dim
         self.action_dim = action_dim

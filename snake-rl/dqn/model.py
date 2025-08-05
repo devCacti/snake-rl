@@ -9,8 +9,8 @@ class DQN(nn.Module):
     def __init__(self, input_dim, output_dim):
         super(DQN, self).__init__()
         self.fc1 = nn.Linear(input_dim, 64)
-        self.fc2 = nn.Linear(64, 32)
-        self.out = nn.Linear(32, output_dim)
+        self.fc2 = nn.Linear(64, 64)
+        self.out = nn.Linear(64, output_dim)
 
     def forward(self, x):
         x = torch.relu(self.fc1(x))

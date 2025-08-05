@@ -29,7 +29,7 @@ def train():
         device=torch.device("cuda" if torch.cuda.is_available() else "cpu"),
         epsilon_start=1.0,  # Max epsilon
         epsilon_end=0.005,  # Min epsilon
-        epsilon_decay=10000,  # High value to allow for more exploration for longer
+        epsilon_decay=15000,  # High value to allow for more exploration for longer
         gamma=0.99,  # Discount factor
         batch_size=BATCH_SIZE,
     )
@@ -40,8 +40,8 @@ def train():
     episode_rewards = np.zeros(NUM_ENVS)
     envs.render_mode = "training"
 
-    max_steps = 20_000  # 20k steps is already a lot, this can train an entire agent in a few minutes
-    target_update_freq = 500
+    max_steps = 17_500  # 20k steps is already a lot, this can train an entire agent in a few minutes
+    target_update_freq = 1000
 
     avg_rewards = []
     plt.ion()  # Turn on interactive mode

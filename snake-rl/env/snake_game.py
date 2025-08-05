@@ -110,9 +110,17 @@ class SnakeGame(gym.Env):
                 alignment, dirv
             )  # Reward for aligning with food
 
+            # Calculate dangers based on the observation space
             num_dangers = sum(
-                self.is_danger(new_head, dx, dy)
-                for dx, dy in [(0, 1), (0, -1), (-1, 0), (1, 0)]
+                self.is_danger(new_head, oy, ox)
+                for oy, ox in [
+                    (-1, 0),  # Forward
+                    (-2, -1),  # Forward left
+                    (-2, 0),  # Forward center
+                    (-2, 1),  # Forward right
+                    (0, -1),  # Left
+                    (0, 1),  # Right
+                ]
             )
 
             reward -= DANGER_SCALE * num_dangers  # Penalty for danger
@@ -136,10 +144,10 @@ class SnakeGame(gym.Env):
         )
 
     def _get_observation(self):
-        head = self.snake[0]
-        head_y, head_x = head
+        head_y, head_x = self.snake[0]
         food_y, food_x = self.food
 
+        # Relative position to food
         rel_x = (food_x - head_x) / self.grid_size
         rel_y = (food_y - head_y) / self.grid_size
 
@@ -151,29 +159,73 @@ class SnakeGame(gym.Env):
         dir_left = int((dx, dy) == (0, -1))
         dir_right = int((dx, dy) == (0, 1))
 
-        # Danger detection
-        danger_front = self.is_danger(head, dx, dy)
-        danger_left = self.is_danger(head, -dy, dx)  # 90° left
-        danger_right = self.is_danger(head, dy, -dx)  # 90° right
+        # === Custom Vision Pattern (relative to facing UP) ===
+        pattern_up = [
+            # Left
+            (-3, -2),
+            (-3, -1),
+            (-3, 0),
+            (-3, 1),
+            (-3, 2),
+            (-2, 1),
+            (-2, 0),
+            (-2, -1),
+            (-1, 0),
+            # Right
+            (3, -2),
+            (3, -1),
+            (3, 0),
+            (3, 1),
+            (3, 2),
+            (2, 1),
+            (2, 0),
+            (2, -1),
+            (1, 0),
+            # Up
+            (-2, 3),
+            (-1, 3),
+            (0, 3),
+            (1, 3),
+            (2, 3),
+            (-1, 2),
+            (0, 2),
+            (1, 2),
+            (0, 1),
+        ]
 
-        self.danger_front_flag = danger_front
-        self.danger_left_flag = danger_left
-        self.danger_right_flag = danger_right
+        # Rotate offset based on current facing direction
+        def rotate_offset(off_y, off_x, facing):
+            if facing == (-1, 0):
+                return off_y, off_x  # UP
+            elif facing == (1, 0):
+                return -off_y, -off_x  # DOWN
+            elif facing == (0, 1):
+                return off_x, -off_y  # RIGHT
+            elif facing == (0, -1):
+                return -off_x, off_y  # LEFT
+            else:
+                raise ValueError(f"Invalid direction: {facing}")
 
+        # Compute danger flags
+        danger_flags = []
+        for oy, ox in pattern_up:
+            dy_rot, dx_rot = rotate_offset(oy, ox, (dx, dy))
+            danger = self.is_danger((head_y, head_x), dy_rot, dx_rot)
+            danger_flags.append(int(danger))
+
+        self.danger_vision_flags = danger_flags
+
+        # Combine all observations
         obs = [
             rel_x,
             rel_y,
-            danger_front,
-            danger_left,
-            danger_right,
+            *danger_flags,
             dir_up,
             dir_down,
             dir_left,
             dir_right,
-            # * Snake length is pointless in this case because it brings no importance to the agent if it is long or short because we are not giving it a reward for being long
-            # // len(self.snake) / (self.grid_size * self.grid_size),
         ]
-        return obs
+        return np.array(obs, dtype=np.float32)
 
     def _place_food(self):
         while True:
@@ -192,61 +244,83 @@ class SnakeGame(gym.Env):
 
         cell_size = CELL_SIZE
         width, height = self.grid_size * cell_size, self.grid_size * cell_size
+        stats_size = 200  # Width of stats panel
 
         # --- Main game window ---
         if not hasattr(self, "screen"):
             pygame.init()
-            self.screen = pygame.display.set_mode((width, height))
-            pygame.display.set_caption("Snake RL")
+            self.screen = pygame.display.set_mode((width + stats_size, height))
+            pygame.display.set_caption("Snake RL + Stats")
             self.clock = pygame.time.Clock()
 
         self.screen.fill((0, 0, 0))
 
+        # --- Draw snake ---
         for segment in self.snake:
             x, y = segment[1] * cell_size, segment[0] * cell_size
             pygame.draw.rect(
                 self.screen, (0, 255, 0), (x, y, cell_size, cell_size), border_radius=8
             )
 
+        # --- Draw food ---
         fx, fy = self.food[1] * cell_size, self.food[0] * cell_size
         pygame.draw.rect(
             self.screen, (255, 0, 0), (fx, fy, cell_size, cell_size), border_radius=8
         )
 
-        # --- Stats window ---
-        stats_size = 200
-        if not hasattr(self, "stats_screen"):
-            self.stats_screen = pygame.display.set_mode((width + stats_size, height))
-            self.stats_surface = pygame.Surface((stats_size, height))
-            self.stats_surface.fill((30, 30, 30))
-            pygame.display.set_caption("Snake RL + Stats")
-
-        # Draw snake head as green circle in center
-        self.stats_surface.fill((30, 30, 30))
+        # --- Stats panel ---
+        self.stats_surface = pygame.Surface((stats_size, height))
+        self.stats_surface.fill((30, 30, 30))  # Background
         center = (stats_size // 2, height // 2)
-        pygame.draw.circle(self.stats_surface, (0, 255, 0), center, 10)
+        pygame.draw.circle(self.stats_surface, (0, 255, 0), center, 6)  # Snake head
 
-        # Draw dangers as red circles around the head
-        offset = 40
-        if getattr(self, "danger_front_flag", False):
-            pygame.draw.circle(
-                self.stats_surface, (255, 0, 0), (center[0], center[1] - offset), 10
-            )
-        if getattr(self, "danger_left_flag", False):
-            pygame.draw.circle(
-                self.stats_surface, (255, 0, 0), (center[0] - offset, center[1]), 10
-            )
-        if getattr(self, "danger_right_flag", False):
-            pygame.draw.circle(
-                self.stats_surface, (255, 0, 0), (center[0] + offset, center[1]), 10
-            )
+        # Matching the vision pattern (same as pattern_up used in get_observation)
+        pattern_up = [
+            # Left
+            (-3, -2),
+            (-3, -1),
+            (-3, 0),
+            (-3, 1),
+            (-3, 2),
+            (-2, 1),
+            (-2, 0),
+            (-2, -1),
+            (-1, 0),
+            # Right
+            (3, -2),
+            (3, -1),
+            (3, 0),
+            (3, 1),
+            (3, 2),
+            (2, 1),
+            (2, 0),
+            (2, -1),
+            (1, 0),
+            # Up
+            (-2, 3),
+            (-1, 3),
+            (0, 3),
+            (1, 3),
+            (2, 3),
+            (-1, 2),
+            (0, 2),
+            (1, 2),
+            (0, 1),
+        ]
 
-        # Combine both displays
+        # Render each tile from vision_flags around the center
+        spacing = 12  # Pixel distance per grid step
+        for i, (dy, dx) in enumerate(pattern_up):
+            px = center[0] + dx * spacing
+            py = center[1] + dy * spacing
+            color = (255, 0, 0) if self.danger_vision_flags[i] else (80, 80, 80)
+            pygame.draw.circle(self.stats_surface, color, (px, py), 5)
+
+        # Combine game + stats
         combined = pygame.Surface((width + stats_size, height))
         combined.blit(self.screen, (0, 0))
         combined.blit(self.stats_surface, (width, 0))
         pygame.display.get_surface().blit(combined, (0, 0))
-
         pygame.display.flip()
         self.clock.tick(10)
 
