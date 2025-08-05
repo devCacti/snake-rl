@@ -20,14 +20,16 @@ CELL_SIZE = 20  # Size of each cell in pixels
 
 
 class SnakeGame(gym.Env):
+    metadata = {"render_modes": ["human"], "render_fps": 10}
 
-    def __init__(self, grid_size=10):
+    def __init__(self, grid_size=10, render_mode="training"):
         super(SnakeGame, self).__init__()
         self.grid_size = grid_size
         self.action_space = spaces.Discrete(4)  # Up, Down, Left, Right
         self.snake = [(grid_size // 2, grid_size // 2)]
         self.direction = (0, 1)  # Start moving right
         self.food = self._place_food()
+        self.render_mode = render_mode
         self.reset()
         obs = self._get_observation()  # Initial observation
         self.step_count = 0
@@ -65,6 +67,8 @@ class SnakeGame(gym.Env):
             self.snake[0][0] + self.direction[0],
             self.snake[0][1] + self.direction[1],
         )
+
+        self.render(self.render_mode)
 
         # Calculates the delta distance to the food
         # This is used to determine if the snake is getting closer or further from the food
@@ -170,7 +174,10 @@ class SnakeGame(gym.Env):
             if food_position not in self.snake:
                 return food_position
 
-    def render(self, mode="human"):
+    def render(self, mode: str | None = "training"):
+        if mode == "training":
+            return
+
         import pygame
 
         # --- Pygame graphical rendering ---

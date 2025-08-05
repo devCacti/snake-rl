@@ -39,9 +39,9 @@ def train():
 
     states, infos = envs.reset()
     episode_rewards = np.zeros(NUM_ENVS)
-    envs.render_mode = "human"
+    envs.render_mode = "training"
 
-    max_steps = 200_000
+    max_steps = 5_000
     target_update_freq = 1000
 
     avg_rewards = []
@@ -139,6 +139,7 @@ def train():
         if step % target_update_freq == 0:
             agent.update_target_network()
 
+    agent.save("checkpoints/dqn_snake_agent.pth")
     envs.close()
 
 
