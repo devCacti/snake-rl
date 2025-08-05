@@ -23,3 +23,9 @@ The main library I will be using is `PyTorch`, I will not be using `TensorFlow` 
 1. **Run** `cd snake-rl`
 
 2. **Run** `python -m dqn.train`
+
+### Play Mode
+
+1. **Run** `cd snake-rl`
+
+2. **Run** `python -m dqn.play`

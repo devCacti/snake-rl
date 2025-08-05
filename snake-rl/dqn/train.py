@@ -9,7 +9,7 @@ import pandas as pd
 from sklearn.linear_model import LinearRegression  # Add at the top
 
 NUM_ENVS = 25
-BATCH_SIZE = 128
+BATCH_SIZE = 256
 
 
 def make_env():
@@ -41,7 +41,7 @@ def train():
     episode_rewards = np.zeros(NUM_ENVS)
     envs.render_mode = "training"
 
-    max_steps = 5_000
+    max_steps = 50_000
     target_update_freq = 1000
 
     avg_rewards = []
@@ -73,8 +73,8 @@ def train():
         # This is a common practice in DQN to stabilize training
         agent.train_step()
         agent.train_step()
-        # agent.train_step()
-        # agent.train_step()
+        agent.train_step()
+        agent.train_step()
         # agent.train_step()
         # agent.train_step()
         # agent.train_step()
@@ -139,7 +139,19 @@ def train():
         if step % target_update_freq == 0:
             agent.update_target_network()
 
-    agent.save("checkpoints/dqn_snake_agent.pth")
+    # Get the date and time for the checkpoint's filename
+    from datetime import datetime
+
+    now = datetime.now()
+    timestamp = now.strftime("%Y%m%d_%H%M%S")
+
+    print("Training complete. Saving model...")
+    agent.save("checkpoints/dqn_snake_agent_" + timestamp + ".pth")
+    print("Model saved.")
+
+    # Save the plot to "training_plots/dqn_snake_agent_(timestamp).png"
+    plt.savefig(f"training_plots/dqn_snake_agent_{timestamp}.png")
+    plt.ioff()  # Turn off interactive mode
     envs.close()
 
 
