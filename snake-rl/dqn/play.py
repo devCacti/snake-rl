@@ -5,8 +5,8 @@ from dqn.play_agent import PlayAgent
 from env.snake_game import SnakeGame
 from gym.spaces import Discrete
 
-CHECKPOINT_PATH = "checkpoints/dqn_snake_agent.pth"
 GRID_SIZE = 10
+CHECKPOINT_PATH = "checkpoints/dqn_snake_agent_latest.pth"
 
 
 def play():
@@ -20,6 +20,9 @@ def play():
 
     # Init agent and load weights
     agent = PlayAgent(state_dim, action_dim, device)
+    # "checkpoints/dqn_snake_agent_" + timestamp + ".pth"
+    # Get the latest checkpoint (Based on the name)
+    print(f"Loading agent from {CHECKPOINT_PATH}")
     agent.load(CHECKPOINT_PATH)
     agent.epsilon = 0.0  # No exploration
 

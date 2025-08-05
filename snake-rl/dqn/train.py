@@ -28,8 +28,8 @@ def train():
         action_dim=n_actions,
         device=torch.device("cuda" if torch.cuda.is_available() else "cpu"),
         epsilon_start=1.0,  # Max epsilon
-        epsilon_end=0.1,  # Min epsilon
-        epsilon_decay=10000,
+        epsilon_end=0.01,  # Min epsilon
+        epsilon_decay=15000,  # High value to allow for more exploration for longer
         gamma=0.99,  # Discount factor
         lr=1e-3,  # ? I do not know what this is used for
         batch_size=BATCH_SIZE,
@@ -147,6 +147,7 @@ def train():
 
     print("Training complete. Saving model...")
     agent.save("checkpoints/dqn_snake_agent_" + timestamp + ".pth")
+    agent.save("checkpoints/dqn_snake_agent_latest.pth")  # Save the latest model
     print("Model saved.")
 
     # Save the plot to "training_plots/dqn_snake_agent_(timestamp).png"
