@@ -15,10 +15,10 @@ class PlayAgent:
         device,
         gamma=0.99,
         lr=1e-3,
-        epsilon_start=1.0,
-        epsilon_end=0.1,
+        epsilon_start=0,
+        epsilon_end=0,
         epsilon_decay=500,
-        batch_size=256,
+        batch_size=512,
     ):
         self.state_dim = state_dim
         self.action_dim = action_dim
@@ -45,26 +45,14 @@ class PlayAgent:
         batch_size = states.shape[0]
         self.steps_done += batch_size
 
-        # Epsilon decay (same for whole batch)
-        eps_threshold = self.epsilon_end + (self.epsilon - self.epsilon_end) * np.exp(
-            -1.0 * self.steps_done / self.epsilon_decay
-        )
-
         actions = []
         states_tensor = states.to(device=self.device, dtype=torch.float32)
 
         with torch.no_grad():
             q_values = self.policy_net(states_tensor)
 
-        #! Epsilon-greedy action selection
         for i in range(batch_size):
-            # * If a random chosen number is less than the epsilon threshold, it will generate random actions for all environments in the batch
-            if random.random() < eps_threshold:
-                actions.append(random.randint(0, self.action_dim - 1))
-
-            # * Otherwise, it will select the action with the highest Q-value
-            else:
-                actions.append(q_values[i].argmax().item())
+            actions.append(q_values[i].argmax().item())
 
         return np.array(actions)
 
@@ -112,7 +100,7 @@ class PlayAgent:
         )
 
     def load(self, path):
-        checkpoint = torch.load(path, map_location=self.device)
+        checkpoint = torch.load(path, map_location=self.device, weights_only=True)
         self.policy_net.load_state_dict(checkpoint["model_state_dict"])
         self.target_net.load_state_dict(checkpoint["target_state_dict"])
         self.optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
