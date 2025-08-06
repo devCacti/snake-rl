@@ -18,7 +18,7 @@ class PlayAgent:
         epsilon_start=0.0,
         epsilon_end=0.0,
         epsilon_decay=500,
-        batch_size=512,
+        batch_size=1024,
     ):
         self.state_dim = state_dim
         self.action_dim = action_dim
@@ -30,7 +30,7 @@ class PlayAgent:
         self.target_net.eval()
 
         self.optimizer = torch.optim.Adam(self.policy_net.parameters(), lr=lr)
-        self.memory = ReplayBuffer(capacity=50_000)
+        self.memory = ReplayBuffer(capacity=200_000)
         self.batch_size = batch_size
         self.gamma = gamma
 

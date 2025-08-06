@@ -22,7 +22,7 @@ eps_threshold = self.epsilon_end + (self.epsilon - self.epsilon_end) * np.exp(
 
 ### Epsilon Formula
 
-# $$ f(x) = b + (a - b) \cdot e^{-\left( \frac{x}{c} \right)} $$
+![formula](<https://latex.codecogs.com/svg.latex?%5Cfontsize%7B90%7D%7B48%7D%5Cselectfont%20f(x)%20=%20b%20+%20(a-b)%5Ccdot%20e%5E%7B-%5Cleft(%5Cfrac%7Bx%7D%7Bc%7D%5Cright)%7D>)
 
 - **a = Epsilon**
 - **b = Epsilon End**
@@ -64,4 +64,3 @@ It then saves the plot to a png matching the file name with the checkpoint saved
 1. **Run** `cd snake-rl`
 
 2. **Run** `python -m dqn.play`
-   $$

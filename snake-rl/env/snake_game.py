@@ -12,9 +12,10 @@ STEP_PENALTY = -0.01
 ALIVE = +0.02
 
 # Reward scaling factors
+LOW_REACHABILITY_SCALE = 0.075
 ALIGN_SCALE = 0.075
 DIST_SCALE = 0.1
-DANGER_SCALE = 0.005
+DANGER_SCALE = 0.0025
 
 # Constants for rendering
 CELL_SIZE = 20  # Size of each cell in pixels
@@ -195,7 +196,9 @@ class SnakeGame(gym.Env):
 
             # Penalize big drops in reachable space (entering holes)
             if space_diff < -5:  # Lost more than 5 safe cells
-                reward -= 0.05 * abs(space_diff)  # Scale penalty with how bad it is
+                reward -= LOW_REACHABILITY_SCALE * abs(
+                    space_diff
+                )  # Scale penalty with how bad it is
 
         return self._get_observation(), reward, False, False, {}
 

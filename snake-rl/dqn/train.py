@@ -39,7 +39,7 @@ def train():
     episode_rewards = np.zeros(NUM_ENVS)
     envs.render_mode = "training"
 
-    max_steps = 25_000  # 20k steps is already a lot, this can train an entire agent in a few minutes
+    max_steps = 25_000
     target_update_freq = 1000
 
     avg_rewards = []
