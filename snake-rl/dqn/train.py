@@ -74,10 +74,7 @@ def train():
         agent.train_step()
         agent.train_step()
         agent.train_step()
-        # agent.train_step()
-        # agent.train_step()
-        # agent.train_step()
-        # agent.train_step()
+        agent.train_step()
 
         if step % target_update_freq == 0:
             avg_reward = np.mean(episode_rewards)

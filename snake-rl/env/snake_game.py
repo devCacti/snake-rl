@@ -13,10 +13,44 @@ ALIVE = +0.02
 # Reward scaling factors
 ALIGN_SCALE = 0.05
 DIST_SCALE = 0.1
-DANGER_SCALE = 0.05
+DANGER_SCALE = 0.01
 
 # Constants for rendering
 CELL_SIZE = 20  # Size of each cell in pixels
+
+PATTERN_UP = [
+    # Y, X
+    # Up
+    (-3, -2),
+    (-3, -1),
+    (-3, 0),
+    (-3, 1),
+    (-3, 2),
+    (-2, 1),
+    (-2, 0),
+    (-2, -1),
+    (-1, 0),
+    # Left
+    (2, -3),
+    (1, -3),
+    (0, -3),
+    (-1, -3),
+    (-2, -3),
+    (1, -2),
+    (0, -2),
+    (-1, -2),
+    (0, -1),
+    # Right
+    (-2, 3),
+    (-1, 3),
+    (0, 3),
+    (1, 3),
+    (2, 3),
+    (-1, 2),
+    (0, 2),
+    (1, 2),
+    (0, 1),
+]
 
 
 class SnakeGame(gym.Env):
@@ -110,18 +144,15 @@ class SnakeGame(gym.Env):
                 alignment, dirv
             )  # Reward for aligning with food
 
+            dx, dy = self.direction
+            head_x, head_y = self.snake[0]
+
             # Calculate dangers based on the observation space
-            num_dangers = sum(
-                self.is_danger(new_head, oy, ox)
-                for oy, ox in [
-                    (-1, 0),  # Forward
-                    (-2, -1),  # Forward left
-                    (-2, 0),  # Forward center
-                    (-2, 1),  # Forward right
-                    (0, -1),  # Left
-                    (0, 1),  # Right
-                ]
-            )
+            num_dangers = 0
+            for oy, ox in PATTERN_UP:
+                dy_rot, dx_rot = self.rotate_offset(oy, ox, (dx, dy))
+                danger = self.is_danger((head_y, head_x), dy_rot, dx_rot)
+                num_dangers += 1 if danger else 0
 
             reward -= DANGER_SCALE * num_dangers  # Penalty for danger
             reward += STEP_PENALTY  # Small penalty for each step taken
@@ -160,56 +191,11 @@ class SnakeGame(gym.Env):
         dir_right = int((dx, dy) == (0, 1))
 
         # === Custom Vision Pattern (relative to facing UP) ===
-        pattern_up = [
-            # Left
-            (-3, -2),
-            (-3, -1),
-            (-3, 0),
-            (-3, 1),
-            (-3, 2),
-            (-2, 1),
-            (-2, 0),
-            (-2, -1),
-            (-1, 0),
-            # Right
-            (3, -2),
-            (3, -1),
-            (3, 0),
-            (3, 1),
-            (3, 2),
-            (2, 1),
-            (2, 0),
-            (2, -1),
-            (1, 0),
-            # Up
-            (-2, 3),
-            (-1, 3),
-            (0, 3),
-            (1, 3),
-            (2, 3),
-            (-1, 2),
-            (0, 2),
-            (1, 2),
-            (0, 1),
-        ]
-
-        # Rotate offset based on current facing direction
-        def rotate_offset(off_y, off_x, facing):
-            if facing == (-1, 0):
-                return off_y, off_x  # UP
-            elif facing == (1, 0):
-                return -off_y, -off_x  # DOWN
-            elif facing == (0, 1):
-                return off_x, -off_y  # RIGHT
-            elif facing == (0, -1):
-                return -off_x, off_y  # LEFT
-            else:
-                raise ValueError(f"Invalid direction: {facing}")
 
         # Compute danger flags
         danger_flags = []
-        for oy, ox in pattern_up:
-            dy_rot, dx_rot = rotate_offset(oy, ox, (dx, dy))
+        for oy, ox in PATTERN_UP:
+            dy_rot, dx_rot = self.rotate_offset(oy, ox, (dx, dy))
             danger = self.is_danger((head_y, head_x), dy_rot, dx_rot)
             danger_flags.append(int(danger))
 
@@ -226,6 +212,19 @@ class SnakeGame(gym.Env):
             dir_right,
         ]
         return np.array(obs, dtype=np.float32)
+
+    # Rotate offset based on current facing direction
+    def rotate_offset(self, off_y, off_x, facing):
+        if facing == (-1, 0):
+            return off_y, off_x  # UP
+        elif facing == (1, 0):
+            return -off_y, -off_x  # DOWN
+        elif facing == (0, 1):
+            return off_x, -off_y  # RIGHT
+        elif facing == (0, -1):
+            return -off_x, off_y  # LEFT
+        else:
+            raise ValueError(f"Invalid direction: {facing}")
 
     def _place_food(self):
         while True:
@@ -274,47 +273,15 @@ class SnakeGame(gym.Env):
         center = (stats_size // 2, height // 2)
         pygame.draw.circle(self.stats_surface, (0, 255, 0), center, 6)  # Snake head
 
-        # Matching the vision pattern (same as pattern_up used in get_observation)
-        pattern_up = [
-            # Left
-            (-3, -2),
-            (-3, -1),
-            (-3, 0),
-            (-3, 1),
-            (-3, 2),
-            (-2, 1),
-            (-2, 0),
-            (-2, -1),
-            (-1, 0),
-            # Right
-            (3, -2),
-            (3, -1),
-            (3, 0),
-            (3, 1),
-            (3, 2),
-            (2, 1),
-            (2, 0),
-            (2, -1),
-            (1, 0),
-            # Up
-            (-2, 3),
-            (-1, 3),
-            (0, 3),
-            (1, 3),
-            (2, 3),
-            (-1, 2),
-            (0, 2),
-            (1, 2),
-            (0, 1),
-        ]
+        # Matching the vision pattern (same as PATTERN_UP used in get_observation)
 
         # Render each tile from vision_flags around the center
-        spacing = 12  # Pixel distance per grid step
-        for i, (dy, dx) in enumerate(pattern_up):
+        spacing = 20  # Pixel distance per grid step
+        for i, (dy, dx) in enumerate(PATTERN_UP):
             px = center[0] + dx * spacing
             py = center[1] + dy * spacing
             color = (255, 0, 0) if self.danger_vision_flags[i] else (80, 80, 80)
-            pygame.draw.circle(self.stats_surface, color, (px, py), 5)
+            pygame.draw.circle(self.stats_surface, color, (px, py), 10)
 
         # Combine game + stats
         combined = pygame.Surface((width + stats_size, height))
