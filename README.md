@@ -49,7 +49,7 @@ During the training process, the program initiates a **plot** to show the averag
 
 It then saves the plot to a png matching the file name with the checkpoint saved.
 
-![Training Plot](snake-rl/training_plots/dqn_snake_agent_20250805_170037.png)
+![Training Plot](snake-rl/training_plots/dqn_snake_agent_20250805_185812.png)
 
 ## Run Commands
 

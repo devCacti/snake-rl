@@ -4,7 +4,6 @@ from env.snake_game import SnakeGame
 from dqn.agent import DQNAgent
 import gym
 import matplotlib.pyplot as plt
-from IPython.display import display, clear_output
 import pandas as pd
 from sklearn.linear_model import LinearRegression  # Add at the top
 
@@ -29,7 +28,7 @@ def train():
         device=torch.device("cuda" if torch.cuda.is_available() else "cpu"),
         epsilon_start=1.0,  # Max epsilon
         epsilon_end=0.005,  # Min epsilon
-        epsilon_decay=15000,  # High value to allow for more exploration for longer
+        epsilon_decay=5000,  # High value to allow for more exploration for longer
         gamma=0.99,  # Discount factor
         batch_size=BATCH_SIZE,
     )
@@ -40,12 +39,12 @@ def train():
     episode_rewards = np.zeros(NUM_ENVS)
     envs.render_mode = "training"
 
-    max_steps = 17_500  # 20k steps is already a lot, this can train an entire agent in a few minutes
+    max_steps = 25_000  # 20k steps is already a lot, this can train an entire agent in a few minutes
     target_update_freq = 1000
 
     avg_rewards = []
     plt.ion()  # Turn on interactive mode
-    fig, ax = plt.subplots()
+    _, ax = plt.subplots()
     (line,) = ax.plot([], [])
     ax.set_xlabel("Step")
     ax.set_ylabel("Average Reward")
@@ -70,7 +69,6 @@ def train():
         # Train the agent multiple times per step
         # This is to ensure that the agent learns from the transitions
         # This is a common practice in DQN to stabilize training
-        agent.train_step()
         agent.train_step()
         agent.train_step()
         agent.train_step()

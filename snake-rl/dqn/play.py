@@ -20,11 +20,12 @@ def play():
 
     # Init agent and load weights
     agent = PlayAgent(state_dim, action_dim, device)
+    agent.batch_size = 1024
     # "checkpoints/dqn_snake_agent_" + timestamp + ".pth"
     # Get the latest checkpoint (Based on the name)
     print(f"Loading agent from {CHECKPOINT_PATH}")
     agent.load(CHECKPOINT_PATH)
-    agent.epsilon = 0.0  # No exploration
+    agent.epsilon = 0  # No exploration
 
     state = np.array(obs, dtype=np.float32)
     total_reward = 0
@@ -32,7 +33,7 @@ def play():
     while True:
         # Pick action from policy
         action = agent.select_action(
-            torch.tensor([state], dtype=torch.float32).to(device)
+            torch.tensor(np.array([state]), dtype=torch.float32).to(device)
         )[
             0
         ]  # select_action returns np.array

@@ -3,6 +3,7 @@ import gym
 from gym import spaces
 import random
 from torch import _euclidean_dist
+from collections import deque
 
 # Rewards
 EAT_FOOD = +1.0
@@ -11,45 +12,82 @@ STEP_PENALTY = -0.01
 ALIVE = +0.02
 
 # Reward scaling factors
-ALIGN_SCALE = 0.05
+ALIGN_SCALE = 0.075
 DIST_SCALE = 0.1
-DANGER_SCALE = 0.01
+DANGER_SCALE = 0.005
 
 # Constants for rendering
 CELL_SIZE = 20  # Size of each cell in pixels
 
 PATTERN_UP = [
     # Y, X
-    # Up
+    # Layer -4
+    (-4, -2),
+    (-4, -1),
+    (-4, 0),
+    (-4, 1),
+    (-4, 2),
+    # Layer -3
+    (-3, -3),
     (-3, -2),
     (-3, -1),
     (-3, 0),
     (-3, 1),
     (-3, 2),
-    (-2, 1),
-    (-2, 0),
-    (-2, -1),
-    (-1, 0),
-    # Left
-    (2, -3),
-    (1, -3),
-    (0, -3),
-    (-1, -3),
+    (-3, 3),
+    # Layer -2
+    (-2, -4),
     (-2, -3),
-    (1, -2),
-    (0, -2),
-    (-1, -2),
-    (0, -1),
-    # Right
+    (-2, -2),
+    (-2, -1),
+    (-2, 0),
+    (-2, 1),
+    (-2, 2),
     (-2, 3),
+    (-2, 4),
+    # Layer -1
+    (-1, 4),
     (-1, 3),
-    (0, 3),
-    (1, 3),
-    (2, 3),
     (-1, 2),
+    (-1, 1),
+    (-1, 0),
+    (-1, -1),
+    (-1, -2),
+    (-1, -3),
+    (-1, -4),
+    # Layer 0
+    (0, 4),
+    (0, 3),
     (0, 2),
-    (1, 2),
     (0, 1),
+    (0, -1),
+    (0, -2),
+    (0, -3),
+    (0, -4),
+    # Layer 1
+    (1, -4),
+    (1, -3),
+    (1, -2),
+    (1, -1),
+    (1, 0),
+    (1, 1),
+    (1, 2),
+    (1, 3),
+    (1, 4),
+    # Layer 2
+    (2, -3),
+    (2, -2),
+    (2, -1),
+    (2, 0),
+    (2, 1),
+    (2, 2),
+    (2, 3),
+    # Layer 3
+    (3, -2),
+    (3, -1),
+    (3, 0),
+    (3, 1),
+    (3, 2),
 ]
 
 
@@ -85,24 +123,21 @@ class SnakeGame(gym.Env):
 
     def step(self, action):
         self.step_count += 1
-
-        # Directions in clockwise order: UP, RIGHT, DOWN, LEFT
         directions = [(-1, 0), (0, 1), (1, 0), (0, -1)]
-
-        # Find current direction index
         idx = directions.index(self.direction)
 
-        # Action mapping: 0 = Turn Left, 1 = Straight, 2 = Turn Right
-        if action == 0:  # Turn Left
-            idx = (idx - 1) % 4
-        elif action == 2:  # Turn Right
-            idx = (idx + 1) % 4
-        # action == 1 → Straight, idx stays the same
+        # Save reachable space BEFORE moving
+        before_space = self.bfs_reachable_area(
+            self.snake[0][0], self.snake[0][1], self.snake, self.grid_size
+        )
 
-        # Update direction
+        # Action mapping: 0 = Turn Left, 1 = Straight, 2 = Turn Right
+        if action == 0:
+            idx = (idx - 1) % 4
+        elif action == 2:
+            idx = (idx + 1) % 4
         self.direction = directions[idx]
 
-        # Calculates the new head position based on the current direction
         new_head = (
             self.snake[0][0] + self.direction[0],
             self.snake[0][1] + self.direction[1],
@@ -110,26 +145,25 @@ class SnakeGame(gym.Env):
 
         self.render(self.render_mode)
 
-        # Calculates the delta distance to the food
-        # This is used to determine if the snake is getting closer or further from the food
         prev_dist = self._euclidean_dist(self.snake[0], self.food)
         new_dist = self._euclidean_dist(new_head, self.food)
 
+        # Check death
         if new_head in self.snake or not (
             0 <= new_head[0] < self.grid_size and 0 <= new_head[1] < self.grid_size
         ):
-            return self._get_observation(), DIE, True, False, {}  # Game over
+            return self._get_observation(), DIE, True, False, {}
 
         if new_head == self.food:
             self.snake.insert(0, new_head)
             self.food = self._place_food()
-            reward = EAT_FOOD  # Reward for eating food
+            reward = EAT_FOOD
         else:
-            self.snake.insert(0, new_head)  # Always move the head
-            self.snake.pop()  # Remove the tail if not eating
+            self.snake.insert(0, new_head)
+            self.snake.pop()
 
             distance_delta = prev_dist - new_dist
-            reward = DIST_SCALE * distance_delta  # Reward for getting closer to food
+            reward = DIST_SCALE * distance_delta
 
             alignment = np.array(
                 [
@@ -137,29 +171,32 @@ class SnakeGame(gym.Env):
                     self.food[1] - new_head[1] / self.grid_size,
                 ]
             )
-
             dirv = np.array(self.direction)
-
-            reward += ALIGN_SCALE * np.dot(
-                alignment, dirv
-            )  # Reward for aligning with food
+            reward += ALIGN_SCALE * np.dot(alignment, dirv)
 
             dx, dy = self.direction
             head_x, head_y = self.snake[0]
-
-            # Calculate dangers based on the observation space
             num_dangers = 0
             for oy, ox in PATTERN_UP:
                 dy_rot, dx_rot = self.rotate_offset(oy, ox, (dx, dy))
                 danger = self.is_danger((head_y, head_x), dy_rot, dx_rot)
                 num_dangers += 1 if danger else 0
 
-            reward -= DANGER_SCALE * num_dangers  # Penalty for danger
-            reward += STEP_PENALTY  # Small penalty for each step taken
+            reward -= DANGER_SCALE * num_dangers
+            reward += STEP_PENALTY
             reward += ALIGN_SCALE * (self.direction[0] + self.direction[1])
-            reward += ALIVE  # Small positive reward for moving
+            reward += ALIVE
 
-        # c_step += 1
+            # Check reachable space AFTER move
+            after_space = self.bfs_reachable_area(
+                self.snake[0][0], self.snake[0][1], self.snake, self.grid_size
+            )
+            space_diff = after_space - before_space
+
+            # Penalize big drops in reachable space (entering holes)
+            if space_diff < -5:  # Lost more than 5 safe cells
+                reward -= 0.05 * abs(space_diff)  # Scale penalty with how bad it is
+
         return self._get_observation(), reward, False, False, {}
 
     def _euclidean_dist(self, a, b):
@@ -190,16 +227,30 @@ class SnakeGame(gym.Env):
         dir_left = int((dx, dy) == (0, -1))
         dir_right = int((dx, dy) == (0, 1))
 
-        # === Custom Vision Pattern (relative to facing UP) ===
-
-        # Compute danger flags
+        # Danger flags
         danger_flags = []
         for oy, ox in PATTERN_UP:
             dy_rot, dx_rot = self.rotate_offset(oy, ox, (dx, dy))
             danger = self.is_danger((head_y, head_x), dy_rot, dx_rot)
             danger_flags.append(int(danger))
-
         self.danger_vision_flags = danger_flags
+
+        # RayCasts
+        front, left, right = self.get_relative_directions(dx, dy)
+        self.ray_directions = [front, left, right]
+        self.raycasts = [
+            self.raycast(head_y, head_x, *front, self.snake, self.grid_size),
+            self.raycast(head_y, head_x, *left, self.snake, self.grid_size),
+            self.raycast(head_y, head_x, *right, self.snake, self.grid_size),
+        ]
+
+        # NEW: Reachable space feature
+        reachable_cells = self.bfs_reachable_area(
+            head_y, head_x, self.snake, self.grid_size
+        )
+        reachable_ratio = reachable_cells / (
+            self.grid_size * self.grid_size
+        )  # normalize
 
         # Combine all observations
         obs = [
@@ -210,8 +261,52 @@ class SnakeGame(gym.Env):
             dir_down,
             dir_left,
             dir_right,
+            *self.raycasts,
+            reachable_ratio,  # NEW FEATURE
         ]
         return np.array(obs, dtype=np.float32)
+
+    def get_relative_directions(self, dx, dy):
+        # Front is same as current direction
+        front = (dx, dy)
+        # Left is 90° turn counter-clockwise
+        left = (-dy, dx)
+        # Right is 90° turn clockwise
+        right = (dy, -dx)
+        return front, left, right
+
+    def bfs_reachable_area(self, start_y, start_x, snake_body, grid_size):
+        visited = set()
+        q = deque()
+        q.append((start_y, start_x))
+        visited.add((start_y, start_x))
+        obstacles = set(snake_body)
+
+        while q:
+            y, x = q.popleft()
+            for ny, nx in [(y - 1, x), (y + 1, x), (y, x - 1), (y, x + 1)]:
+                if 0 <= ny < grid_size and 0 <= nx < grid_size:
+                    if (ny, nx) not in visited and (ny, nx) not in obstacles:
+                        visited.add((ny, nx))
+                        q.append((ny, nx))
+        return len(visited)  # Total reachable cells
+
+    def raycast(self, start_y, start_x, dir_y, dir_x, snake_body, grid_size: int):
+        dist = 0
+        y, x = start_y, start_x
+
+        while True:
+            y += dir_y
+            x += dir_x
+            dist += 1
+
+            # Wall hit
+            if y < 0 or y >= grid_size or x < 0 or x >= grid_size:
+                return dist
+
+            # Snake body hit
+            if (y, x) in snake_body:
+                return dist
 
     # Rotate offset based on current facing direction
     def rotate_offset(self, off_y, off_x, facing):
@@ -243,6 +338,7 @@ class SnakeGame(gym.Env):
 
         cell_size = CELL_SIZE
         width, height = self.grid_size * cell_size, self.grid_size * cell_size
+        head_x, head_y = self.snake[0]
         stats_size = 200  # Width of stats panel
 
         # --- Main game window ---
@@ -283,6 +379,19 @@ class SnakeGame(gym.Env):
             color = (255, 0, 0) if self.danger_vision_flags[i] else (80, 80, 80)
             pygame.draw.circle(self.stats_surface, color, (px, py), 10)
 
+        # RayCasts Debugging
+        if hasattr(self, "ray_directions") and hasattr(self, "raycasts"):
+            for dir_idx, (dx, dy) in enumerate(self.ray_directions):
+                dist = self.raycasts[dir_idx]
+                for step in range(1, dist):
+                    ry = head_y + dy * step
+                    rx = head_x + dx * step
+                    px = rx * cell_size + cell_size // 2
+                    py = ry * cell_size + cell_size // 2
+                    pygame.draw.circle(
+                        self.screen, (150, 150, 150), (py, px), cell_size // 5
+                    )
+
         # Combine game + stats
         combined = pygame.Surface((width + stats_size, height))
         combined.blit(self.screen, (0, 0))
@@ -304,18 +413,17 @@ class SnakeGame(gym.Env):
         import time
         import keyboard
 
+        self.render_mode = "human"
         self.reset()
-        action = 0
+        action = 1
         while True:
             self.render()
-            if keyboard.is_pressed("w"):
+            if keyboard.is_pressed("a"):
                 action = 0
-            elif keyboard.is_pressed("s"):
-                action = 1
-            elif keyboard.is_pressed("a"):
-                action = 2
             elif keyboard.is_pressed("d"):
-                action = 3
+                action = 2
+            else:
+                action = 1
 
             obs, reward, done, _, __ = self.step(action)
             print(f"Reward: {reward}")
