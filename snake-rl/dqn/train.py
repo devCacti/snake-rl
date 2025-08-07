@@ -28,7 +28,7 @@ def train():
         device=torch.device("cuda" if torch.cuda.is_available() else "cpu"),
         epsilon_start=1.0,  # Max epsilon
         epsilon_end=0.005,  # Min epsilon
-        epsilon_decay=5000,  # High value to allow for more exploration for longer
+        epsilon_decay=2000,  # High value to allow for more exploration for longer
         gamma=0.99,  # Discount factor
         batch_size=BATCH_SIZE,
     )
@@ -39,7 +39,7 @@ def train():
     episode_rewards = np.zeros(NUM_ENVS)
     envs.render_mode = "training"
 
-    max_steps = 25_000
+    max_steps = 50_000
     target_update_freq = 1000
 
     avg_rewards = []
