@@ -23,12 +23,15 @@ CELL_SIZE = 20  # Size of each cell in pixels
 PATTERN_UP = [
     # Y, X
     # Layer -5
+    (-5, -3),
     (-5, -2),
     (-5, -1),
     (-5, 0),
     (-5, 1),
     (-5, 2),
+    (-5, 3),
     # Layer -4
+    (-4, -4),
     (-4, -3),
     (-4, -2),
     (-4, -1),
@@ -36,7 +39,9 @@ PATTERN_UP = [
     (-4, 1),
     (-4, 2),
     (-4, 3),
+    (-4, 4),
     # Layer -3
+    (-3, -5),
     (-3, -4),
     (-3, -3),
     (-3, -2),
@@ -46,7 +51,9 @@ PATTERN_UP = [
     (-3, 2),
     (-3, 3),
     (-3, 4),
+    (-3, 5),
     # Layer -2
+    (-2, -5),
     (-2, -4),
     (-2, -3),
     (-2, -2),
@@ -56,6 +63,7 @@ PATTERN_UP = [
     (-2, 2),
     (-2, 3),
     (-2, 4),
+    (-2, 5),
     # Layer -1
     (-1, 5),
     (-1, 4),
@@ -92,6 +100,7 @@ PATTERN_UP = [
     (1, 4),
     (1, 5),
     # Layer 2
+    (2, -5),
     (2, -4),
     (2, -3),
     (2, -2),
@@ -101,7 +110,9 @@ PATTERN_UP = [
     (2, 2),
     (2, 3),
     (2, 4),
+    (2, 5),
     # Layer 3
+    (3, -4),
     (3, -3),
     (3, -2),
     (3, -1),
@@ -109,6 +120,15 @@ PATTERN_UP = [
     (3, 1),
     (3, 2),
     (3, 3),
+    (3, 4),
+    # Layer 4
+    (4, -3),
+    (4, -2),
+    (4, -1),
+    (4, 0),
+    (4, 1),
+    (4, 2),
+    (4, 3),
 ]
 
 
@@ -395,12 +415,12 @@ class SnakeGame(gym.Env):
         # Matching the vision pattern (same as PATTERN_UP used in get_observation)
 
         # Render each tile from vision_flags around the center
-        spacing = 20  # Pixel distance per grid step
+        spacing = 16  # Pixel distance per grid step
         for i, (dy, dx) in enumerate(PATTERN_UP):
             px = center[0] + dx * spacing
             py = center[1] + dy * spacing
             color = (255, 0, 0) if self.danger_vision_flags[i] else (80, 80, 80)
-            pygame.draw.circle(self.stats_surface, color, (px, py), 10)
+            pygame.draw.circle(self.stats_surface, color, (px, py), 8)
 
         # RayCasts Debugging
         if hasattr(self, "ray_directions") and hasattr(self, "raycasts"):

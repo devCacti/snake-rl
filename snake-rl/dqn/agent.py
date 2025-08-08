@@ -79,20 +79,30 @@ class DQNAgent:
             self.batch_size
         )
 
-        states = torch.FloatTensor(states).to(self.device)
-        actions = torch.LongTensor(actions).unsqueeze(1).to(self.device)
-        rewards = torch.FloatTensor(rewards).unsqueeze(1).to(self.device)
-        next_states = torch.FloatTensor(next_states).to(self.device)
-        dones = torch.FloatTensor(dones).unsqueeze(1).to(self.device)
+        states = torch.FloatTensor(states).to(self.device, non_blocking=True)
+        actions = (
+            torch.LongTensor(actions).unsqueeze(1).to(self.device, non_blocking=True)
+        )
+        rewards = (
+            torch.FloatTensor(rewards).unsqueeze(1).to(self.device, non_blocking=True)
+        )
+        next_states = torch.FloatTensor(next_states).to(self.device, non_blocking=True)
+        dones = torch.FloatTensor(dones).unsqueeze(1).to(self.device, non_blocking=True)
 
-        q_values = self.policy_net(states).gather(1, actions).to(self.device)
+        q_values = self.policy_net(states).gather(1, actions)
         with torch.no_grad():
             max_next_q_values = (
-                self.target_net(next_states).max(1)[0].unsqueeze(1).to(self.device)
+                self.target_net(next_states)
+                .max(1)[0]
+                .unsqueeze(1)
+                .to(self.device, non_blocking=True)
             )
             target_q_values = rewards + self.gamma * max_next_q_values * (1 - dones)
 
-        loss = F.mse_loss(q_values, target_q_values)
+        # loss = F.mse_loss(q_values, target_q_values)
+
+        loss_fn = torch.nn.SmoothL1Loss()
+        loss = loss_fn(q_values, target_q_values)
 
         self.optimizer.zero_grad()
         loss.backward()

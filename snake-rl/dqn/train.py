@@ -6,9 +6,10 @@ import gym
 import matplotlib.pyplot as plt
 import pandas as pd
 from sklearn.linear_model import LinearRegression  # Add at the top
+from datetime import datetime
 
-NUM_ENVS = 25
-BATCH_SIZE = 256
+NUM_ENVS = 6
+BATCH_SIZE = 64
 
 
 def make_env():
@@ -28,9 +29,10 @@ def train():
         device=torch.device("cuda" if torch.cuda.is_available() else "cpu"),
         epsilon_start=1.0,  # Max epsilon
         epsilon_end=0.005,  # Min epsilon
-        epsilon_decay=2000,  # High value to allow for more exploration for longer
+        epsilon_decay=50000,  # High value to allow for more exploration for longer
         gamma=0.99,  # Discount factor
         batch_size=BATCH_SIZE,
+        lr=5e-4,
     )
 
     print(f"Using device: {agent.device}")
@@ -39,7 +41,7 @@ def train():
     episode_rewards = np.zeros(NUM_ENVS)
     envs.render_mode = "training"
 
-    max_steps = 50_000
+    max_steps = 200_000
     target_update_freq = 1000
 
     avg_rewards = []
@@ -55,9 +57,6 @@ def train():
         next_states, rewards, terminations, truncations, infos = envs.step(actions)  # type: ignore
         dones = np.logical_or(terminations, truncations)
 
-        if step % agent.epsilon_decay == 0:
-            agent.epsilon = max(agent.epsilon_end, agent.epsilon * agent.gamma)
-
         for i in range(NUM_ENVS):
             agent.store_transition(
                 states[i], actions[i], rewards[i], next_states[i], dones[i]
@@ -69,8 +68,6 @@ def train():
         # Train the agent multiple times per step
         # This is to ensure that the agent learns from the transitions
         # This is a common practice in DQN to stabilize training
-        agent.train_step()
-        agent.train_step()
         agent.train_step()
         agent.train_step()
 
@@ -133,8 +130,17 @@ def train():
         if step % target_update_freq == 0:
             agent.update_target_network()
 
+        if step % (max_steps / 8) == 0 and step != 0:
+            now = datetime.now()
+            timestamp = now.strftime("%Y%m%d_%H%M%S")
+            print("Saving model...")
+            agent.save("checkpoints/dqn_snake_agent_" + timestamp + ".pth")
+            agent.save(
+                "checkpoints/dqn_snake_agent_latest.pth"
+            )  # Save the latest model
+            print("Model saved.")
+
     # Get the date and time for the checkpoint's filename
-    from datetime import datetime
 
     now = datetime.now()
     timestamp = now.strftime("%Y%m%d_%H%M%S")

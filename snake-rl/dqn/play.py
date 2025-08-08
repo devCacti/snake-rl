@@ -20,7 +20,7 @@ def play():
 
     # Init agent and load weights
     agent = PlayAgent(state_dim, action_dim, device)
-    agent.batch_size = 1024
+    agent.batch_size = 4096
     # "checkpoints/dqn_snake_agent_" + timestamp + ".pth"
     # Get the latest checkpoint (Based on the name)
     print(f"Loading agent from {CHECKPOINT_PATH}")
