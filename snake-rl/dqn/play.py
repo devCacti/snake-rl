@@ -1,9 +1,7 @@
 import torch
 import numpy as np
-from typing import cast
 from dqn.play_agent import PlayAgent
 from env.snake_game import SnakeGame
-from gym.spaces import Discrete
 
 GRID_SIZE = 10
 CHECKPOINT_PATH = "checkpoints/dqn_snake_agent_latest.pth"
@@ -16,7 +14,7 @@ def play():
     env = SnakeGame(grid_size=GRID_SIZE, render_mode="human")
     obs, _ = env.reset()
     state_dim = len(obs)
-    action_dim = int(cast(Discrete, env.action_space).n)
+    action_dim = env.action_dim
 
     # Init agent and load weights
     agent = PlayAgent(state_dim, action_dim, device)
@@ -39,7 +37,7 @@ def play():
         ]  # select_action returns np.array
 
         # Step env
-        next_state, reward, done, _, _ = env.step(action)
+        next_state, reward, done = env.step(action)
         total_reward += reward
         state = np.array(next_state, dtype=np.float32)
 

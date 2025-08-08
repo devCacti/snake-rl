@@ -1,10 +1,8 @@
-import random
-import numpy as np
+import math
 import torch
-import torch.nn.functional as F
-from collections import deque
 from dqn.model import DQN
 from dqn.replay_buffer import ReplayBuffer
+from tensor.to_tensor import to_tensor
 
 
 class DQNAgent:
@@ -30,7 +28,7 @@ class DQNAgent:
         self.target_net.eval()
 
         self.optimizer = torch.optim.Adam(self.policy_net.parameters(), lr=lr)
-        self.memory = ReplayBuffer(capacity=200_000)
+        self.memory = ReplayBuffer(capacity=200_000, device=device)
         self.batch_size = batch_size
         self.gamma = gamma
 
@@ -45,31 +43,31 @@ class DQNAgent:
         batch_size = states.shape[0]
         self.steps_done += batch_size
 
-        # Epsilon decay (same for whole batch)
-        eps_threshold = self.epsilon_end + (self.epsilon - self.epsilon_end) * np.exp(
+        # Epsilon decay
+        eps_threshold = self.epsilon_end + (self.epsilon - self.epsilon_end) * math.exp(
             -1.0 * self.steps_done / self.epsilon_decay
         )
 
-        actions = []
-        states_tensor = torch.FloatTensor(states).to(self.device)
-
+        states_tensor = to_tensor(states, dtype=torch.float32, device=self.device)
         with torch.no_grad():
             q_values = self.policy_net(states_tensor)
 
-        #! Epsilon-greedy action selection
-        for i in range(batch_size):
-            # * If a random chosen number is less than the epsilon threshold, it will generate random actions for all environments in the batch
-            if random.random() < eps_threshold:
-                actions.append(random.randint(0, self.action_dim - 1))
+        # Vectorized epsilon-greedy
+        random_values = torch.rand(batch_size, device=self.device)
+        greedy_actions = q_values.argmax(dim=1)
+        random_actions = torch.randint(
+            0, self.action_dim, (batch_size,), device=self.device
+        )
 
-            # * Otherwise, it will select the action with the highest Q-value
-            else:
-                actions.append(q_values[i].argmax().item())
+        # Choose random or greedy based on epsilon threshold
+        actions = torch.where(
+            random_values < eps_threshold, random_actions, greedy_actions
+        )
 
-        return np.array(actions)
+        return actions
 
     def store_transition(self, state, action, reward, next_state, done):
-        self.memory.buffer.append((state, action, reward, next_state, done))
+        self.memory.append(state, action, reward, next_state, done)
 
     def train_step(self):
         if len(self.memory) < self.batch_size:
@@ -79,31 +77,16 @@ class DQNAgent:
             self.batch_size
         )
 
-        states = torch.FloatTensor(states).to(self.device, non_blocking=True)
-        actions = (
-            torch.LongTensor(actions).unsqueeze(1).to(self.device, non_blocking=True)
-        )
-        rewards = (
-            torch.FloatTensor(rewards).unsqueeze(1).to(self.device, non_blocking=True)
-        )
-        next_states = torch.FloatTensor(next_states).to(self.device, non_blocking=True)
-        dones = torch.FloatTensor(dones).unsqueeze(1).to(self.device, non_blocking=True)
+        actions = actions.unsqueeze(1)
+        rewards = rewards.unsqueeze(1)
+        dones = dones.float().unsqueeze(1)  # Convert bool to float for math
 
         q_values = self.policy_net(states).gather(1, actions)
         with torch.no_grad():
-            max_next_q_values = (
-                self.target_net(next_states)
-                .max(1)[0]
-                .unsqueeze(1)
-                .to(self.device, non_blocking=True)
-            )
+            max_next_q_values = self.target_net(next_states).max(1)[0].unsqueeze(1)
             target_q_values = rewards + self.gamma * max_next_q_values * (1 - dones)
 
-        # loss = F.mse_loss(q_values, target_q_values)
-
-        loss_fn = torch.nn.SmoothL1Loss()
-        loss = loss_fn(q_values, target_q_values)
-
+        loss = torch.nn.SmoothL1Loss()(q_values, target_q_values)
         self.optimizer.zero_grad()
         loss.backward()
         self.optimizer.step()
@@ -130,4 +113,4 @@ class DQNAgent:
         self.target_net.to(self.device)
         self.policy_net.eval()
         self.target_net.eval()
-        self.memory = ReplayBuffer(capacity=100_000)
+        self.memory = ReplayBuffer(capacity=100_000, device=self.device)

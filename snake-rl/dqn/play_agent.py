@@ -1,8 +1,5 @@
-import random
-import numpy as np
 import torch
-import torch.nn.functional as F
-from collections import deque
+from tensor.to_tensor import to_tensor
 from dqn.model import DQN
 from dqn.replay_buffer import ReplayBuffer
 
@@ -30,7 +27,7 @@ class PlayAgent:
         self.target_net.eval()
 
         self.optimizer = torch.optim.Adam(self.policy_net.parameters(), lr=lr)
-        self.memory = ReplayBuffer(capacity=200_000)
+        self.memory = ReplayBuffer(capacity=200_000, device=device)
         self.batch_size = batch_size
         self.gamma = gamma
 
@@ -54,7 +51,7 @@ class PlayAgent:
         for i in range(batch_size):
             actions.append(q_values[i].argmax().item())
 
-        return np.array(actions)
+        return to_tensor(actions, dtype=torch.float32, device=self.device)
 
     def load(self, path):
         checkpoint = torch.load(path, map_location=self.device, weights_only=True)
@@ -65,4 +62,4 @@ class PlayAgent:
         self.target_net.to(self.device)
         self.policy_net.eval()
         self.target_net.eval()
-        self.memory = ReplayBuffer(capacity=100_000)
+        self.memory = ReplayBuffer(capacity=100_000, device=self.device)

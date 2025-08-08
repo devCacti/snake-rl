@@ -1,9 +1,7 @@
-import numpy as np
-import gym
-from gym import spaces
 import random
-from torch import _euclidean_dist
+import torch
 from collections import deque
+from dqn.observation_spec import ObservationSpec
 
 # Rewards
 EAT_FOOD = +1.0
@@ -132,25 +130,24 @@ PATTERN_UP = [
 ]
 
 
-class SnakeGame(gym.Env):
-    metadata = {"render_modes": ["human"], "render_fps": 10}
+class SnakeGame:
 
     def __init__(self, grid_size=10, render_mode="training"):
+
         super(SnakeGame, self).__init__()
         self.grid_size = grid_size
-        self.action_space = spaces.Discrete(3)  # Left, Straight, Right
         self.snake = [(grid_size // 2, grid_size // 2)]
         self.direction = (0, 1)  # Start moving right
         self.food = self._place_food()
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.render_mode = render_mode
+        self.step_count = 0
         self.reset()
         obs = self._get_observation()  # Initial observation
-        self.step_count = 0
-        self.observation_space = (
-            spaces.Box(  # Calculates the size of the observation space
-                low=-1.0, high=1.0, shape=(len(obs),), dtype=np.float32
-            )
-        )
+
+        # Action and Observation Spaces
+        self.action_dim = 3  # Left, Straight, Right
+        self.observation_space = ObservationSpec(shape=len(obs))
 
     def reset(self, *, seed=None, options=None):
         # Do NOT call super().reset(seed=seed)
@@ -160,7 +157,7 @@ class SnakeGame(gym.Env):
         obs = self._get_observation()
 
         # Or return obs, {} is for compatibility with gym API, it also allows for additional info if needed
-        return (obs, {})
+        return obs
 
     def step(self, action):
         self.step_count += 1
@@ -183,9 +180,6 @@ class SnakeGame(gym.Env):
             self.snake[0][0] + self.direction[0],
             self.snake[0][1] + self.direction[1],
         )
-
-        self.render(self.render_mode)
-
         prev_dist = self._euclidean_dist(self.snake[0], self.food)
         new_dist = self._euclidean_dist(new_head, self.food)
 
@@ -193,7 +187,7 @@ class SnakeGame(gym.Env):
         if new_head in self.snake or not (
             0 <= new_head[0] < self.grid_size and 0 <= new_head[1] < self.grid_size
         ):
-            return self._get_observation(), DIE, True, False, {}
+            return self._get_observation(), DIE, True
 
         if new_head == self.food:
             self.snake.insert(0, new_head)
@@ -206,14 +200,18 @@ class SnakeGame(gym.Env):
             distance_delta = prev_dist - new_dist
             reward = DIST_SCALE * distance_delta
 
-            alignment = np.array(
+            alignment = torch.tensor(
                 [
                     self.food[0] - new_head[0] / self.grid_size,
                     self.food[1] - new_head[1] / self.grid_size,
-                ]
+                ],
+                dtype=torch.float32,
             )
-            dirv = np.array(self.direction)
-            reward += ALIGN_SCALE * np.dot(alignment, dirv)
+            dirv = torch.tensor(
+                self.direction,
+                dtype=torch.float32,
+            )
+            reward += ALIGN_SCALE * torch.dot(alignment, dirv)
 
             dx, dy = self.direction
             head_x, head_y = self.snake[0]
@@ -239,11 +237,12 @@ class SnakeGame(gym.Env):
                 reward -= LOW_REACHABILITY_SCALE * abs(
                     space_diff
                 )  # Scale penalty with how bad it is
-
-        return self._get_observation(), reward, False, False, {}
+        return self._get_observation(), reward, False
 
     def _euclidean_dist(self, a, b):
-        return np.sqrt((a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2)
+        import math
+
+        return math.sqrt((a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2)
 
     def is_danger(self, from_pos, offset_y, offset_x):
         y, x = from_pos
@@ -296,18 +295,22 @@ class SnakeGame(gym.Env):
         )  # normalize
 
         # Combine all observations
-        obs = [
-            rel_x,
-            rel_y,
-            *danger_flags,
-            dir_up,
-            dir_down,
-            dir_left,
-            dir_right,
-            *self.raycasts,
-            reachable_ratio,  # NEW FEATURE
-        ]
-        return np.array(obs, dtype=np.float32)
+        obs = torch.tensor(
+            [
+                rel_x,
+                rel_y,
+                *danger_flags,
+                dir_up,
+                dir_down,
+                dir_left,
+                dir_right,
+                *self.raycasts,
+                reachable_ratio,
+            ],
+            dtype=torch.float32,
+            device=self.device,
+        )  # shape: [obs_dim]
+        return obs
 
     def get_relative_directions(self, dx, dy):
         # Front is same as current direction
@@ -374,7 +377,7 @@ class SnakeGame(gym.Env):
                 return food_position
 
     def render(self, mode: str | None = "training"):
-        if mode == "training":
+        if mode == "training" and self.render_mode == "training":
             return
 
         import pygame
@@ -468,7 +471,7 @@ class SnakeGame(gym.Env):
             else:
                 action = 1
 
-            obs, reward, done, _, __ = self.step(action)
+            _, reward, done = self.step(action)
             print(f"Reward: {reward}")
             if done:
                 print("Game Over!")

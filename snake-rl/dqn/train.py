@@ -1,45 +1,45 @@
-import numpy as np
 import torch
-from env.snake_game import SnakeGame
-from dqn.agent import DQNAgent
-import gym
 import matplotlib.pyplot as plt
 import pandas as pd
 from sklearn.linear_model import LinearRegression  # Add at the top
 from datetime import datetime
+from env.snake_game import SnakeGame
+from dqn.agent import DQNAgent
+from env.parallel_env_manager import ParallelEnvManager
 
-NUM_ENVS = 6
-BATCH_SIZE = 64
+NUM_ENVS = 12
+BATCH_SIZE = 128
+DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+MIN_BUFFER_SIZE = 512
 
 
 def make_env():
-    return lambda: SnakeGame(grid_size=10)
+    return lambda: SnakeGame()  # Grid Size is Default to 10
 
 
 def train():
 
-    envs = gym.vector.AsyncVectorEnv([make_env() for _ in range(NUM_ENVS)])  # type: ignore
+    envs = ParallelEnvManager([make_env() for _ in range(NUM_ENVS)])
 
-    obs_dim = envs.single_observation_space.shape[0]  # type: ignore
-    n_actions = envs.single_action_space.n  # type: ignore
+    obs_dim = envs.single_observation_space  # type: ignore
+    n_actions = envs.single_action_space  # type: ignore
 
     agent = DQNAgent(
         state_dim=obs_dim,
         action_dim=n_actions,
-        device=torch.device("cuda" if torch.cuda.is_available() else "cpu"),
+        device=DEVICE,
         epsilon_start=1.0,  # Max epsilon
         epsilon_end=0.005,  # Min epsilon
         epsilon_decay=50000,  # High value to allow for more exploration for longer
         gamma=0.99,  # Discount factor
         batch_size=BATCH_SIZE,
-        lr=5e-4,
+        lr=1e-3,
     )
 
     print(f"Using device: {agent.device}")
 
-    states, infos = envs.reset()
-    episode_rewards = np.zeros(NUM_ENVS)
-    envs.render_mode = "training"
+    states = envs.reset()
+    episode_rewards = torch.zeros(NUM_ENVS, dtype=torch.float32, device=DEVICE)
 
     max_steps = 200_000
     target_update_freq = 1000
@@ -54,8 +54,7 @@ def train():
 
     for step in range(max_steps):
         actions = agent.select_action(states)
-        next_states, rewards, terminations, truncations, infos = envs.step(actions)  # type: ignore
-        dones = np.logical_or(terminations, truncations)
+        next_states, rewards, dones = envs.step(actions)
 
         for i in range(NUM_ENVS):
             agent.store_transition(
@@ -65,19 +64,36 @@ def train():
             if dones[i]:
                 episode_rewards[i] = 0
 
-        # Train the agent multiple times per step
-        # This is to ensure that the agent learns from the transitions
-        # This is a common practice in DQN to stabilize training
-        agent.train_step()
-        agent.train_step()
+        states = next_states
+
+        if step % 20 == 0:
+            if len(agent.memory) > MIN_BUFFER_SIZE:
+                for _ in range(6):
+                    agent.train_step()
 
         if step % target_update_freq == 0:
-            avg_reward = np.mean(episode_rewards)
+            agent.update_target_network()
+
+        if step % (max_steps / 8) == 0 and step != 0:
+            now = datetime.now()
+            timestamp = now.strftime("%Y%m%d_%H%M%S")
+            print("Saving model...")
+            agent.save("checkpoints/dqn_snake_agent_" + timestamp + ".pth")
+            agent.save(
+                "checkpoints/dqn_snake_agent_latest.pth"
+            )  # Save the latest model
+            print("Model saved.")
+
+        # Plot Related
+        if step % target_update_freq == 0:
+            import numpy
+
+            avg_reward = torch.mean(episode_rewards).item()
             avg_rewards.append(avg_reward)
             print(f"Step: {step}, Average Reward: {avg_reward:.2f}")
 
             # Update main line
-            x_vals = np.arange(len(avg_rewards)) * target_update_freq
+            x_vals = numpy.arange(len(avg_rewards)) * target_update_freq
             line.set_xdata(x_vals)
             line.set_ydata(avg_rewards)
 
@@ -98,8 +114,9 @@ def train():
 
             # --- Linear regression trend line (every 1000 steps) ---
             if len(avg_rewards) > 1:
+
                 x = x_vals.reshape(-1, 1)
-                y = np.array(avg_rewards)
+                y = numpy.array(avg_rewards)
                 model = LinearRegression().fit(x, y)
                 y_pred = model.predict(x)
                 if not hasattr(ax, "trend_line"):
@@ -125,23 +142,7 @@ def train():
             plt.draw()
             plt.pause(0.1)
 
-        states = next_states
-
-        if step % target_update_freq == 0:
-            agent.update_target_network()
-
-        if step % (max_steps / 8) == 0 and step != 0:
-            now = datetime.now()
-            timestamp = now.strftime("%Y%m%d_%H%M%S")
-            print("Saving model...")
-            agent.save("checkpoints/dqn_snake_agent_" + timestamp + ".pth")
-            agent.save(
-                "checkpoints/dqn_snake_agent_latest.pth"
-            )  # Save the latest model
-            print("Model saved.")
-
     # Get the date and time for the checkpoint's filename
-
     now = datetime.now()
     timestamp = now.strftime("%Y%m%d_%H%M%S")
 
