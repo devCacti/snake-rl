@@ -38,9 +38,18 @@ class DQNAgent:
         self.steps_done = 0
 
     def select_action(self, states):
+        # Handle tuple input (e.g., from some Gym wrappers)
         if isinstance(states, tuple):
             states = states[0]
-        batch_size = states.shape[0]
+
+        # Convert to tensor
+        states_tensor = to_tensor(states, dtype=torch.float32, device=self.device)
+
+        # If single state, unsqueeze to make it batch-like
+        if states_tensor.dim() == 1:
+            states_tensor = states_tensor.unsqueeze(0)
+
+        batch_size = states_tensor.shape[0]
         self.steps_done += batch_size
 
         # Epsilon decay
@@ -48,7 +57,6 @@ class DQNAgent:
             -1.0 * self.steps_done / self.epsilon_decay
         )
 
-        states_tensor = to_tensor(states, dtype=torch.float32, device=self.device)
         with torch.no_grad():
             q_values = self.policy_net(states_tensor)
 
@@ -59,7 +67,6 @@ class DQNAgent:
             0, self.action_dim, (batch_size,), device=self.device
         )
 
-        # Choose random or greedy based on epsilon threshold
         actions = torch.where(
             random_values < eps_threshold, random_actions, greedy_actions
         )
@@ -93,6 +100,12 @@ class DQNAgent:
 
     def update_target_network(self):
         self.target_net.load_state_dict(self.policy_net.state_dict())
+
+    def soft_update(self, tau=0.005):
+        for target_param, param in zip(
+            self.target_net.parameters(), self.policy_net.parameters()
+        ):
+            target_param.data.copy_(tau * param.data + (1.0 - tau) * target_param.data)
 
     def save(self, path):
         torch.save(

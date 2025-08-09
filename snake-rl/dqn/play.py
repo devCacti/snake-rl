@@ -1,23 +1,22 @@
 import torch
 import numpy as np
-from dqn.play_agent import PlayAgent
+from dqn.agent import DQNAgent
 from env.snake_game import SnakeGame
 
 GRID_SIZE = 10
 CHECKPOINT_PATH = "checkpoints/dqn_snake_agent_latest.pth"
+DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
 def play():
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
     # Create env with rendering
     env = SnakeGame(grid_size=GRID_SIZE, render_mode="human")
-    obs, _ = env.reset()
+    obs = env.reset()
     state_dim = len(obs)
     action_dim = env.action_dim
 
     # Init agent and load weights
-    agent = PlayAgent(state_dim, action_dim, device)
+    agent = DQNAgent(state_dim, action_dim, DEVICE)
     agent.batch_size = 4096
     # "checkpoints/dqn_snake_agent_" + timestamp + ".pth"
     # Get the latest checkpoint (Based on the name)
@@ -25,26 +24,24 @@ def play():
     agent.load(CHECKPOINT_PATH)
     agent.epsilon = 0  # No exploration
 
-    state = np.array(obs, dtype=np.float32)
-    total_reward = 0
+    state = obs
+    total_reward = torch.tensor(0.0, dtype=torch.float32, device=DEVICE)
 
     while True:
         # Pick action from policy
-        action = agent.select_action(
-            torch.tensor(np.array([state]), dtype=torch.float32).to(device)
-        )[
-            0
-        ]  # select_action returns np.array
+        action = agent.select_action(state)[0].item()
+        # select_action returns np.array
 
         # Step env
         next_state, reward, done = env.step(action)
         total_reward += reward
-        state = np.array(next_state, dtype=np.float32)
+        state = next_state
+        env.render()
 
         if done:
             print(f"Game Over! Total reward: {total_reward:.2f}")
             total_reward = 0
-            state, _ = env.reset()
+            state = env.reset()
 
 
 if __name__ == "__main__":

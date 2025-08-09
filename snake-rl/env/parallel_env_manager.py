@@ -32,7 +32,7 @@ class ParallelEnvManager:
         for conn in self.conns:
             conn.send(("reset", None))
         results = [conn.recv() for conn in self.conns]  # list of obs from each env
-        obs = torch.stack([to_tensor(o, torch.float32, DEVICE) for o in results])
+        obs = torch.stack(results)
         print("Reset")
         return obs
 
@@ -41,8 +41,8 @@ class ParallelEnvManager:
             conn.send(("step", action.item()))
         results = [conn.recv() for conn in self.conns]
         obs, rewards, dones = zip(*results)
-        obs = torch.stack([to_tensor(o, torch.float32, DEVICE) for o in obs])
-        rewards = torch.tensor(rewards, dtype=torch.float32, device=DEVICE)
+        obs = torch.stack(obs)
+        rewards = rewards
         dones = torch.tensor(dones, dtype=torch.bool, device=DEVICE)
         return obs, rewards, dones
 

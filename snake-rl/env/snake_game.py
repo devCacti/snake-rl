@@ -1,5 +1,6 @@
 import random
 import torch
+from tensor.to_tensor import to_tensor
 from collections import deque
 from dqn.observation_spec import ObservationSpec
 
@@ -7,13 +8,13 @@ from dqn.observation_spec import ObservationSpec
 EAT_FOOD = +1.0
 DIE = -1.0
 STEP_PENALTY = -0.01
-ALIVE = +0.02
+ALIVE = +0.0075
 
 # Reward scaling factors
 LOW_REACHABILITY_SCALE = 0.075
-ALIGN_SCALE = 0.075
+ALIGN_SCALE = 0.1
 DIST_SCALE = 0.1
-DANGER_SCALE = 0.001
+DANGER_SCALE = 0.0005
 
 # Constants for rendering
 CELL_SIZE = 20  # Size of each cell in pixels
@@ -237,7 +238,11 @@ class SnakeGame:
                 reward -= LOW_REACHABILITY_SCALE * abs(
                     space_diff
                 )  # Scale penalty with how bad it is
-        return self._get_observation(), reward, False
+        return (
+            self._get_observation(),
+            to_tensor(reward, dtype=torch.float32, device=self.device),
+            False,
+        )
 
     def _euclidean_dist(self, a, b):
         import math

@@ -7,10 +7,10 @@ from env.snake_game import SnakeGame
 from dqn.agent import DQNAgent
 from env.parallel_env_manager import ParallelEnvManager
 
-NUM_ENVS = 12
+NUM_ENVS = 6  # I only have 6 logical processors
 BATCH_SIZE = 128
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-MIN_BUFFER_SIZE = 512
+MIN_BUFFER_SIZE = 10_000
 
 
 def make_env():
@@ -30,10 +30,10 @@ def train():
         device=DEVICE,
         epsilon_start=1.0,  # Max epsilon
         epsilon_end=0.005,  # Min epsilon
-        epsilon_decay=50000,  # High value to allow for more exploration for longer
+        epsilon_decay=25000,  # High value to allow for more exploration for longer
         gamma=0.99,  # Discount factor
         batch_size=BATCH_SIZE,
-        lr=1e-3,
+        lr=5e-4,
     )
 
     print(f"Using device: {agent.device}")
@@ -42,7 +42,7 @@ def train():
     episode_rewards = torch.zeros(NUM_ENVS, dtype=torch.float32, device=DEVICE)
 
     max_steps = 200_000
-    target_update_freq = 1000
+    target_update_freq = 500
 
     avg_rewards = []
     plt.ion()  # Turn on interactive mode
@@ -66,15 +66,12 @@ def train():
 
         states = next_states
 
-        if step % 20 == 0:
-            if len(agent.memory) > MIN_BUFFER_SIZE:
-                for _ in range(6):
-                    agent.train_step()
+        agent.train_step()
 
         if step % target_update_freq == 0:
-            agent.update_target_network()
+            agent.soft_update()
 
-        if step % (max_steps / 8) == 0 and step != 0:
+        if step % (max_steps / 4) == 0 and step != 0:
             now = datetime.now()
             timestamp = now.strftime("%Y%m%d_%H%M%S")
             print("Saving model...")
@@ -85,7 +82,8 @@ def train():
             print("Model saved.")
 
         # Plot Related
-        if step % target_update_freq == 0:
+        if step % (target_update_freq * 4) == 0:
+
             import numpy
 
             avg_reward = torch.mean(episode_rewards).item()
@@ -93,7 +91,7 @@ def train():
             print(f"Step: {step}, Average Reward: {avg_reward:.2f}")
 
             # Update main line
-            x_vals = numpy.arange(len(avg_rewards)) * target_update_freq
+            x_vals = numpy.arange(len(avg_rewards)) * target_update_freq * 4
             line.set_xdata(x_vals)
             line.set_ydata(avg_rewards)
 
