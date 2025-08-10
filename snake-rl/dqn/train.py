@@ -8,9 +8,8 @@ from dqn.agent import DQNAgent
 from env.parallel_env_manager import ParallelEnvManager
 
 NUM_ENVS = 6  # I only have 6 logical processors
-BATCH_SIZE = 128
+BATCH_SIZE = 64
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-MIN_BUFFER_SIZE = 10_000
 
 
 def make_env():
@@ -30,7 +29,7 @@ def train():
         device=DEVICE,
         epsilon_start=1.0,  # Max epsilon
         epsilon_end=0.005,  # Min epsilon
-        epsilon_decay=25000,  # High value to allow for more exploration for longer
+        epsilon_decay=50_000,  # High value to allow for more exploration for longer
         gamma=0.99,  # Discount factor
         batch_size=BATCH_SIZE,
         lr=5e-4,
@@ -42,7 +41,7 @@ def train():
     episode_rewards = torch.zeros(NUM_ENVS, dtype=torch.float32, device=DEVICE)
 
     max_steps = 200_000
-    target_update_freq = 500
+    target_update_freq = 1000
 
     avg_rewards = []
     plt.ion()  # Turn on interactive mode
@@ -67,9 +66,11 @@ def train():
         states = next_states
 
         agent.train_step()
+        agent.train_step()
+        # agent.soft_update()
 
         if step % target_update_freq == 0:
-            agent.soft_update()
+            agent.update_target_network()
 
         if step % (max_steps / 4) == 0 and step != 0:
             now = datetime.now()
