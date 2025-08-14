@@ -2,7 +2,7 @@ import math
 import torch
 from dqn.model import DQN
 from dqn.replay_buffer import ReplayBuffer
-from tensor.to_tensor import to_tensor
+from tensor.tensor_ops import to_tensor
 
 
 class DQNAgent:
@@ -38,19 +38,16 @@ class DQNAgent:
         self.steps_done = 0
 
     def select_action(self, states):
-        # Handle tuple input (e.g., from some Gym wrappers)
-        if isinstance(states, tuple):
-            states = states[0]
 
         # Convert to tensor
-        states_tensor = to_tensor(states, dtype=torch.float32, device=self.device)
+        states_tensor = states
 
         # If single state, unsqueeze to make it batch-like
         if states_tensor.dim() == 1:
             states_tensor = states_tensor.unsqueeze(0)
 
-        batch_size = states_tensor.shape[0]
-        self.steps_done += batch_size
+        num_instances = states_tensor.shape[0]
+        self.steps_done += num_instances
 
         # Epsilon decay
         eps_threshold = self.epsilon_end + (self.epsilon - self.epsilon_end) * math.exp(
@@ -61,10 +58,10 @@ class DQNAgent:
             q_values = self.policy_net(states_tensor)
 
         # Vectorized epsilon-greedy
-        random_values = torch.rand(batch_size, device=self.device)
+        random_values = torch.rand(num_instances, device=self.device)
         greedy_actions = q_values.argmax(dim=1)
         random_actions = torch.randint(
-            0, self.action_dim, (batch_size,), device=self.device
+            0, self.action_dim, (num_instances,), device=self.device
         )
 
         actions = torch.where(
