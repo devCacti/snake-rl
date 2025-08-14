@@ -72,14 +72,13 @@ def train():
         if step % target_update_freq == 0:
             agent.update_target_network()
 
-        if step % (max_steps / 4) == 0 and step != 0:
+        if step % (max_steps / 2) == 0 and step != 0:
             now = datetime.now()
             timestamp = now.strftime("%Y%m%d_%H%M%S")
             print("Saving model...")
             agent.save("checkpoints/dqn_snake_agent_" + timestamp + ".pth")
-            agent.save(
-                "checkpoints/dqn_snake_agent_latest.pth"
-            )  # Save the latest model
+            # Save the latest model
+            agent.save("checkpoints/dqn_snake_agent_latest.pth")
             print("Model saved.")
 
         # Plot Related
@@ -144,11 +143,6 @@ def train():
     # Get the date and time for the checkpoint's filename
     now = datetime.now()
     timestamp = now.strftime("%Y%m%d_%H%M%S")
-
-    print("Training complete. Saving model...")
-    agent.save("checkpoints/dqn_snake_agent_" + timestamp + ".pth")
-    agent.save("checkpoints/dqn_snake_agent_latest.pth")  # Save the latest model
-    print("Model saved.")
 
     # Save the plot to "training_plots/dqn_snake_agent_(timestamp).png"
     plt.savefig(f"training_plots/dqn_snake_agent_{timestamp}.png")
